@@ -1,5 +1,6 @@
 ---
 title: "hw1sol"
+author: Rui Xu
 output: html_document
 ---
 
