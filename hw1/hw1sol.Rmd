@@ -1,6 +1,6 @@
 ---
 title: "Biostat 203B Homework 1"
-author: "Rui Xu (UID: 005230642)"
+author: Rui Xu
 subtitle: Due Jan 24 @ 11:59PM
 output: html_document
 ---
@@ -29,7 +29,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 **solution:** Here is a screenshot of my completion report.
 <p align="center">
-  <img src="./Rui_completion.png" height="350" width="500">
+  <img src="./ScreenShot_Rui_completionreport.png" height="350" width="600">
 </p>
 
 2. The `/home/203bdata/mimic-iii/` folder on teaching server contains data sets from MIMIC-III. See <https://mimic.physionet.org/mimictables/admissions/> for details of each table.  
@@ -41,7 +41,7 @@ Please, do **not** put these data files into Git; they are big. Also do **not** 
     Use Bash commands to answer following questions.
 
 3. What's the output of following bash script?
-    ```{bash, eval=FALSE}
+```{bash eval, eval=FALSE}
     for datafile in /home/203bdata/mimic-iii/*.csv
       do
         ls $datafile
@@ -49,7 +49,65 @@ Please, do **not** put these data files into Git; they are big. Also do **not** 
     ```
 Display the number of lines in each `csv` file.
 
+**solution:**
+
+- The output of above code chunk is:
+    ```{bash, eval=TRUE, echo=FALSE}
+    for datafile in /home/203bdata/mimic-iii/*.csv
+      do
+        ls $datafile
+      done
+    ```
+
+- Display the number of lines in each `csv` file:
+    ```{bash}
+    for datafile in /home/203bdata/mimic-iii/*.csv
+      do
+        wc -l $datafile
+      done
+    ```
+
+
 4. Display the first few lines of `ADMISSIONS.csv`. How many rows are in this data file? How many unique patients (identified by `SUBJECT_ID`) are in this data file? What are the possible values taken by each of the variable `INSURANCE`, `LANGUAGE`, `RELIGION`, `MARITAL_STATUS`, and `ETHNICITY`? How many (unique) patients are Hispanic? (Hint: combine Linux comamnds `head`, `tail`, `awk`, `uniq`, `wc`, `sort` and so on using pipe.)
+
+**solution:**
+
+- Let's display first 10 lines of `ADMISSIONS.csv`:
+    ```{bash}
+    head /home/203bdata/mimic-iii/ADMISSIONS.csv
+    ```
+
+- Number of rows in this data file:
+    ```{bash}
+    wc -l /home/203bdata/mimic-iii/ADMISSIONS.csv
+    ```
+
+- Number of unique patients in this data file:
+    ```{bash}
+    awk -F, '{print $2}' /home/203bdata/mimic-iii/ADMISSIONS.csv | tail -58976 | sort | uniq | wc -l
+    ```
+
+- Possible values taken by each of the variable `INSURANCE`, `LANGUAGE`, `RELIGION`, `MARITAL_STATUS`, and `ETHNICITY`:
+    ```{bash}
+    awk -F, '{print $10}' /home/203bdata/mimic-iii/ADMISSIONS.csv | tail -58976 | sort | uniq
+    ```
+    ```{bash}
+    awk -F, '{print $11}' /home/203bdata/mimic-iii/ADMISSIONS.csv | tail -58976 | sort | uniq
+    ```
+    ```{bash}
+    awk -F, '{print $12}' /home/203bdata/mimic-iii/ADMISSIONS.csv | tail -58976 | sort | uniq
+    ```
+    ```{bash}
+    awk -F, '{print $13}' /home/203bdata/mimic-iii/ADMISSIONS.csv | tail -58976 | sort | uniq
+    ```
+    ```{bash}
+    awk -F, '{print $14}' /home/203bdata/mimic-iii/ADMISSIONS.csv | tail -58976 | sort | uniq
+    ```
+
+- Number of patients who are Hispanic:
+    ```{bash}
+    awk -F, '{print $14}' /home/203bdata/mimic-iii/ADMISSIONS.csv | tail -58976 | grep '^"HISPANIC' | wc -l
+    ```
 
 ## Q3. More fun with shell
 
@@ -90,6 +148,11 @@ $$
   \frac{\sum_{r=1}^{\text{rep}} (\widehat \mu_r - \mu_{\text{true}})^2}{\text{rep}}
 $$
 for both methods.
+
+**solution:** This is my `runSim.R` code:
+    ```{bash}
+    cat runSim.R
+    ```
 
 2. Modify the [`autoSim.R`](https://ucla-biostat203b-2020winter.github.io/slides/02-linux/autoSim.R) script to run simulations with combinations of sample sizes `nVals = seq(100, 500, by=100)` and distributions `distTypes = c("gaussian", "t1", "t5")` and write output to appropriately named files. Use `rep = 50`, and `seed = 203`. 
 
