@@ -684,10 +684,33 @@ summary {
 <li><p>You and your friend just have finished reading <em>Pride and Prejudice</em> by Jane Austen. Among the four main characters in the book, Elizabeth, Jane, Lydia, and Darcy, your friend thinks that Darcy was the most mentioned. You, however, are certain it was Elizabeth. Obtain the full text of the novel from <a href="http://www.gutenberg.org/cache/epub/42671/pg42671.txt" class="uri">http://www.gutenberg.org/cache/epub/42671/pg42671.txt</a> and save to your local folder.</p>
 <pre class="bash"><code>curl http://www.gutenberg.org/cache/epub/42671/pg42671.txt &gt; pride_and_prejudice.txt</code></pre>
 <p>Do <strong>not</strong> put this text file <code>pride_and_prejudice.txt</code> in Git. Using a <code>for</code> loop, how would you tabulate the number of times each of the four characters is mentioned?</p></li>
+</ol>
+<p><strong>solution:</strong> Table shows that the number of times each of the four characters is mentioned:</p>
+<pre><code>```bash
+for name in Elizabeth Jane Lydia Darcy
+    do echo $name
+    grep -o $name /home/xurui1996/pride_and_prejudice.txt | wc -l
+done
+```
+
+```
+## Elizabeth
+## 634
+## Jane
+## 294
+## Lydia
+## 170
+## Darcy
+## 417
+```</code></pre>
+<ol start="2" style="list-style-type: decimal">
 <li><p>What’s the difference between the following two commands?</p>
 <pre class="bash"><code>echo 'hello, world' &gt; test1.txt</code></pre>
 <p>and</p>
 <pre class="bash"><code>echo 'hello, world' &gt;&gt; test2.txt</code></pre></li>
+</ol>
+<p><strong>solution:</strong> <code>&gt;</code> directs output from one command to a file. <code>&gt;&gt;</code> appends output from one command to a file. Thus, the first command outputs ‘hello, world’ to test1.txt file, while the second command appends ‘hello, world’ to test2.txt file each time when the command is run.</p>
+<ol start="3" style="list-style-type: decimal">
 <li><p>Using your favorite text editor (e.g., <code>vi</code>), type the following and save the file as <code>middle.sh</code>:</p>
 <pre class="bash"><code>#!/bin/sh
 # Select lines from the middle of a file.
@@ -697,6 +720,11 @@ head -n &quot;$2&quot; &quot;$1&quot; | tail -n &quot;$3&quot;</code></pre>
 <pre class="bash"><code>./middle.sh pride_and_prejudice.txt 20 5</code></pre>
 <p>Explain the output. Explain the meaning of <code>&quot;$1&quot;</code>, <code>&quot;$2&quot;</code>, and <code>&quot;$3&quot;</code> in this shell script. Why do we need the first line of the shell script?</p></li>
 </ol>
+<p><strong>solution:</strong> After creating file <code>middle.sh</code>, and make the file executable by the owner,</p>
+<pre><code>```bash
+./middle.sh pride_and_prejudice.txt 20 5
+```</code></pre>
+<p>This command outputs the author and editor information. ? The first line of the shell script makes the command run in the <code>/bin/sh</code> shell.</p>
 </div>
 <div id="q4.-r-batch-run" class="section level2">
 <h2>Q4. R Batch Run</h2>

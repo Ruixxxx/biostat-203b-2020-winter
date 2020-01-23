@@ -117,7 +117,16 @@ Display the number of lines in each `csv` file.
     ```
 Do **not** put this text file `pride_and_prejudice.txt` in Git. Using a `for` loop, how would you tabulate the number of times each of the four characters is mentioned?
 
-0. What's the difference between the following two commands?
+**solution:** Table shows that the number of times each of the four characters is mentioned:
+
+    ```{bash}
+    for name in Elizabeth Jane Lydia Darcy
+        do echo $name
+        grep -o $name /home/xurui1996/pride_and_prejudice.txt | wc -l
+    done
+    ```
+
+2. What's the difference between the following two commands?
     ```{bash eval=FALSE}
     echo 'hello, world' > test1.txt
     ```
@@ -125,8 +134,10 @@ Do **not** put this text file `pride_and_prejudice.txt` in Git. Using a `for` lo
     ```{bash eval=FALSE}
     echo 'hello, world' >> test2.txt
     ```
+    
+**solution:** `>` directs output from one command to a file. `>>` appends output from one command to a file. Thus, the first command outputs 'hello, world' to test1.txt file, while the second command appends 'hello, world' to test2.txt file each time when the command is run.
 
-0. Using your favorite text editor (e.g., `vi`), type the following and save the file as `middle.sh`:
+3. Using your favorite text editor (e.g., `vi`), type the following and save the file as `middle.sh`:
     ```{bash eval=FALSE}
     #!/bin/sh
     # Select lines from the middle of a file.
@@ -138,6 +149,15 @@ Using `chmod` make the file executable by the owner, and run
     ./middle.sh pride_and_prejudice.txt 20 5
     ```
 Explain the output. Explain the meaning of `"$1"`, `"$2"`, and `"$3"` in this shell script. Why do we need the first line of the shell script?
+
+**solution:** After creating file `middle.sh`, and make the file executable by the owner,
+
+    ```{bash eval=FALSE}
+    ./middle.sh pride_and_prejudice.txt 20 5
+    ```
+
+This command outputs the author and editor information. ?
+The first line of the shell script makes the command run in the `/bin/sh` shell.
 
 ## Q4. R Batch Run
 
