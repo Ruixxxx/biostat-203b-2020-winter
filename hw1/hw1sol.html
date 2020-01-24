@@ -723,8 +723,17 @@ head -n &quot;$2&quot; &quot;$1&quot; | tail -n &quot;$3&quot;</code></pre>
 <p><strong>solution:</strong> After creating file <code>middle.sh</code>, and make the file executable by the owner,</p>
 <pre><code>```bash
 ./middle.sh pride_and_prejudice.txt 20 5
+```
+
+```
+## ./middle.sh: line 1: elect: command not found
+## 
+## Author: Jane Austen
+## 
+## Editor: R. W. (Robert William) Chapman
+## 
 ```</code></pre>
-<p>This command outputs the author and editor information. ? The first line of the shell script makes the command run in the <code>/bin/sh</code> shell.</p>
+<p>This command outputs the 16th-20th line of pride_and_prejudice.txt. This command outputs the author and editor information. <code>&quot;$1&quot;</code> means taking the first input, which is the txt file, <code>&quot;$2&quot;</code> means taking the second input, and <code>&quot;$3&quot;</code> means taking the third input. The first line of the shell script makes the command run in the <code>/bin/sh</code> shell.</p>
 </div>
 <div id="q4.-r-batch-run" class="section level2">
 <h2>Q4. R Batch Run</h2>
