@@ -722,10 +722,12 @@ head -n &quot;$2&quot; &quot;$1&quot; | tail -n &quot;$3&quot;</code></pre>
 </ol>
 <p><strong>solution:</strong> After creating file <code>middle.sh</code>, and make the file executable by the owner,</p>
 <pre><code>```bash
+cd~
 ./middle.sh pride_and_prejudice.txt 20 5
 ```
 
 ```
+## bash: cd~: command not found
 ## ./middle.sh: line 1: elect: command not found
 ## 
 ## Author: Jane Austen
@@ -954,24 +956,35 @@ head -n &quot;$2&quot; &quot;$1&quot; | tail -n &quot;$3&quot;</code></pre>
 ## for (dist in distTypes){
 ##   for (n in nVals){
 ##     filename &lt;- paste(&quot;n_&quot;, n, &quot;_dist_&quot;, dist, &quot;.txt&quot;, sep=&quot;&quot;)
-##     datalist &lt;- read.delim(filename)
+##     datalist &lt;- read.table(filename)
 ##     datalist &lt;- datalist[ , 2]
 ##     info &lt;- c(info, datalist)
 ##     # the first column of the table
 ##     N &lt;- c(N, rep(n, 2))
 ##   }
 ## }
-## N &lt;- N[1: 10]
+## Num &lt;- N[1: 10]
 ## # the second column of the table
 ## Method &lt;- c(&quot;PrimeAvg&quot;, &quot;SampleAvg&quot;)
 ## Method &lt;- rep(Method, 5)
 ## # the table
-## table &lt;- data.frame(n = N, Method = Method, Gaussian = info[1: 10], t5 = info[21: 30], t1 = info[11: 20])
+## table &lt;- data.frame(n = Num, Method = Method, Gaussian = info[1: 10], t_5 = info[21: 30], t_1 = info[11: 20])
 ## 
 ## # print the table
 ## print(table)</code></pre></li>
 <li><p>Write output to appropriately named files:</p>
-<pre class="bash"><code>Rscript PrintSim.R</code></pre></li>
+<pre class="bash"><code>Rscript PrintSim.R</code></pre>
+<pre><code>##      n    Method    Gaussian         t_5       t_1
+## 1  100  PrimeAvg 0.039264580 0.047281910  43.72672
+## 2  100 SampleAvg 0.011464430 0.011320570  26.76927
+## 3  200  PrimeAvg 0.024001610 0.043965280  20.91532
+## 4  200 SampleAvg 0.005764383 0.006573672  43.41982
+## 5  300  PrimeAvg 0.020514360 0.042466820 116.39670
+## 6  300 SampleAvg 0.004199221 0.004420692 138.45650
+## 7  400  PrimeAvg 0.013456000 0.027956910  48.29149
+## 8  400 SampleAvg 0.002870221 0.003922553  76.24066
+## 9  500  PrimeAvg 0.009396678 0.019900230 152.80850
+## 10 500 SampleAvg 0.002191460 0.003111203  53.47290</code></pre></li>
 </ul>
 </div>
 
