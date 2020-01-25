@@ -11,7 +11,7 @@ distTypes <- c("gaussian", "t1", "t5")
 for (dist in distTypes){
   for (n in nVals){
     filename <- paste("n_", n, "_dist_", dist, ".txt", sep="")
-    datalist <- read.delim(filename)
+    datalist <- read.table(filename)
     datalist <- datalist[ , 2]
     info <- c(info, datalist)
     # the first column of the table
