@@ -154,16 +154,11 @@ Explain the output. Explain the meaning of `"$1"`, `"$2"`, and `"$3"` in this sh
 **solution:** After creating file `middle.sh`, and make the file executable by the owner,
 
     ```{bash eval=TRUE}
-    cd~
     ./middle.sh pride_and_prejudice.txt 20 5
     ```
 
 This command outputs the 16th-20th line of pride_and_prejudice.txt. This command outputs the author and editor information. `"$1"` means taking the first input, which is the txt file, `"$2"` means taking the second input, and `"$3"` means taking the third input. The first line of the shell script makes the command run in the `/bin/sh` shell.
 
-Delete the file:
-    ```{bash eval=TRUE}
-    rm pride_and_prejudice.txt
-    ```
 
 ## Q4. R Batch Run
 
