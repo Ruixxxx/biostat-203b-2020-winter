@@ -122,7 +122,7 @@ Do **not** put this text file `pride_and_prejudice.txt` in Git. Using a `for` lo
     ```{bash}
     for name in Elizabeth Jane Lydia Darcy
         do echo $name
-        grep -o $name /home/xurui1996/pride_and_prejudice.txt | wc -l
+        grep -o $name pride_and_prejudice.txt | wc -l
     done
     ```
 
@@ -145,6 +145,7 @@ Do **not** put this text file `pride_and_prejudice.txt` in Git. Using a `for` lo
     head -n "$2" "$1" | tail -n "$3"
     ```
 Using `chmod` make the file executable by the owner, and run 
+
     ```{bash eval=FALSE}
     ./middle.sh pride_and_prejudice.txt 20 5
     ```
@@ -168,12 +169,30 @@ $$
 $$
 for both methods.
 
-**solution:** This is my `runSim.R` code:
+**solution:**
+
+- This is my `runSim.R` code:
     ```{bash}
     cat runSim.R
     ```
+- Here is a sample run:
+    ```{bash}
+    Rscript runSim.R n=100 dist=\"gaussian\" seed=203 rep=50
+    ```
+
 
 2. Modify the [`autoSim.R`](https://ucla-biostat203b-2020winter.github.io/slides/02-linux/autoSim.R) script to run simulations with combinations of sample sizes `nVals = seq(100, 500, by=100)` and distributions `distTypes = c("gaussian", "t1", "t5")` and write output to appropriately named files. Use `rep = 50`, and `seed = 203`. 
+
+**solution:**
+
+- This is my `autoSim.R` code:
+    ```{bash}
+    cat autoSim.R
+    ```
+- Write output to appropriately named files:
+    ```{bash}
+    Rscript autoSim.R
+    ```
 
 3. Write an R script to collect simulation results from output files and print average MSEs in a table of format
 
@@ -189,3 +208,19 @@ for both methods.
 | 400 | SampAvg  |       |       |          |
 | 500 | PrimeAvg |       |       |          |
 | 500 | SampAvg  |       |       |          |
+
+**solution:**
+
+- This is my `PrintSim.R` code:
+    ```{bash}
+    cat PrintSim.R
+    ```
+- Write output to appropriately named files:
+    ```{bash eval = TRUE}
+    Rscript PrintSim.R
+    ```
+
+
+
+
+

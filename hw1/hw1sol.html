@@ -689,7 +689,7 @@ summary {
 <pre><code>```bash
 for name in Elizabeth Jane Lydia Darcy
     do echo $name
-    grep -o $name /home/xurui1996/pride_and_prejudice.txt | wc -l
+    grep -o $name pride_and_prejudice.txt | wc -l
 done
 ```
 
@@ -743,12 +743,12 @@ head -n &quot;$2&quot; &quot;$1&quot; | tail -n &quot;$3&quot;</code></pre>
   \frac{\sum_{r=1}^{\text{rep}} (\widehat \mu_r - \mu_{\text{true}})^2}{\text{rep}}
 \]</span> for both methods.</li>
 </ol>
-<p><strong>solution:</strong> This is my <code>runSim.R</code> code:</p>
-<pre><code>```bash
-cat runSim.R
-```
-
-```
+<p><strong>solution:</strong></p>
+<ul>
+<li><p>This is my <code>runSim.R</code> code:</p>
+<pre class="bash"><code>cat runSim.R</code></pre>
+<pre><code>## ## generate 
+## 
 ## ## parsing command arguments
 ## for (arg in commandArgs(TRUE)) {
 ##   eval(parse(text=arg))
@@ -777,10 +777,11 @@ cat runSim.R
 ## 
 ## mseSampAvg = 0
 ## msePrimeAvg = 0
+## 
+## # simulate data
 ## for (r in 1:rep){
 ##   # parse the distribution information
 ##   if (dist == &quot;gaussian&quot;){
-##     # simulate data
 ##     x = rnorm(n)
 ##   } else if (dist == &quot;t1&quot;){
 ##     x = rt(n, df = 1)
@@ -790,17 +791,68 @@ cat runSim.R
 ##     stop(&quot;unrecognized distribution&quot;)
 ##   }
 ##   
+##   # compute the primed-indexed average estimator and the classical sample average estimator
+##   PrimeAvg = estMeanPrimes(x)
+##   SampAvg = mean(x)
+##   
 ##   # try two methods
+##   msePrimeAvg = msePrimeAvg + estMeanPrimes(x)^2
 ##   mseSampAvg = mseSampAvg + mean(x)^2
-##   msePrimeAvg = msePrimeAvg + mean(x)^2
 ## }
 ## 
-## print(mseSampAvg / rep)
+## # report the MSE
 ## print(msePrimeAvg / rep)
-```</code></pre>
+## print(mseSampAvg / rep)</code></pre></li>
+<li><p>Here is a sample run:</p>
+<pre class="bash"><code>Rscript runSim.R n=100 dist=\&quot;gaussian\&quot; seed=203 rep=50</code></pre>
+<pre><code>## [1] 0.03926458
+## [1] 0.01146443</code></pre></li>
+</ul>
 <ol start="2" style="list-style-type: decimal">
-<li><p>Modify the <a href="https://ucla-biostat203b-2020winter.github.io/slides/02-linux/autoSim.R"><code>autoSim.R</code></a> script to run simulations with combinations of sample sizes <code>nVals = seq(100, 500, by=100)</code> and distributions <code>distTypes = c(&quot;gaussian&quot;, &quot;t1&quot;, &quot;t5&quot;)</code> and write output to appropriately named files. Use <code>rep = 50</code>, and <code>seed = 203</code>.</p></li>
-<li><p>Write an R script to collect simulation results from output files and print average MSEs in a table of format</p></li>
+<li>Modify the <a href="https://ucla-biostat203b-2020winter.github.io/slides/02-linux/autoSim.R"><code>autoSim.R</code></a> script to run simulations with combinations of sample sizes <code>nVals = seq(100, 500, by=100)</code> and distributions <code>distTypes = c(&quot;gaussian&quot;, &quot;t1&quot;, &quot;t5&quot;)</code> and write output to appropriately named files. Use <code>rep = 50</code>, and <code>seed = 203</code>.</li>
+</ol>
+<p><strong>solution:</strong></p>
+<ul>
+<li><p>This is my <code>autoSim.R</code> code:</p>
+<pre class="bash"><code>cat autoSim.R</code></pre>
+<pre><code>## # autoSim.R
+## 
+## # sample sizes/ distributions/ seed/ rep
+## nVals &lt;- seq(100, 500, by=100)
+## distTypes &lt;- c(&quot;gaussian&quot;, &quot;t1&quot;, &quot;t5&quot;)
+## seed &lt;- 203
+## rep &lt;-50
+## 
+## # run simulations and write output to files
+## for (dist in distTypes) {
+##   for (n in nVals){
+##     arg &lt;- paste(&quot;n=&quot;, n, &quot; dist=&quot;, shQuote(shQuote(dist)), &quot; seed=&quot;, seed, &quot; rep=&quot;, rep, sep=&quot;&quot;)
+##     oFile &lt;- paste(&quot;n_&quot;, n, &quot;_dist_&quot;, dist, &quot;.txt&quot;, sep=&quot;&quot;)
+##     sysCall &lt;- paste(&quot;nohup Rscript runSim.R &quot;, arg, &quot; &gt; &quot;, oFile, sep=&quot;&quot;)
+##     system(sysCall, wait = FALSE)
+##     print(paste(&quot;sysCall=&quot;, sysCall, sep=&quot;&quot;))
+##   }
+## }</code></pre></li>
+<li><p>Write output to appropriately named files:</p>
+<pre class="bash"><code>Rscript autoSim.R</code></pre>
+<pre><code>## [1] &quot;sysCall=nohup Rscript runSim.R n=100 dist=\&quot;'gaussian'\&quot; seed=203 rep=50 &gt; n_100_dist_gaussian.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=200 dist=\&quot;'gaussian'\&quot; seed=203 rep=50 &gt; n_200_dist_gaussian.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=300 dist=\&quot;'gaussian'\&quot; seed=203 rep=50 &gt; n_300_dist_gaussian.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=400 dist=\&quot;'gaussian'\&quot; seed=203 rep=50 &gt; n_400_dist_gaussian.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=500 dist=\&quot;'gaussian'\&quot; seed=203 rep=50 &gt; n_500_dist_gaussian.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=100 dist=\&quot;'t1'\&quot; seed=203 rep=50 &gt; n_100_dist_t1.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=200 dist=\&quot;'t1'\&quot; seed=203 rep=50 &gt; n_200_dist_t1.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=300 dist=\&quot;'t1'\&quot; seed=203 rep=50 &gt; n_300_dist_t1.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=400 dist=\&quot;'t1'\&quot; seed=203 rep=50 &gt; n_400_dist_t1.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=500 dist=\&quot;'t1'\&quot; seed=203 rep=50 &gt; n_500_dist_t1.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=100 dist=\&quot;'t5'\&quot; seed=203 rep=50 &gt; n_100_dist_t5.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=200 dist=\&quot;'t5'\&quot; seed=203 rep=50 &gt; n_200_dist_t5.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=300 dist=\&quot;'t5'\&quot; seed=203 rep=50 &gt; n_300_dist_t5.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=400 dist=\&quot;'t5'\&quot; seed=203 rep=50 &gt; n_400_dist_t5.txt&quot;
+## [1] &quot;sysCall=nohup Rscript runSim.R n=500 dist=\&quot;'t5'\&quot; seed=203 rep=50 &gt; n_500_dist_t5.txt&quot;</code></pre></li>
+</ul>
+<ol start="3" style="list-style-type: decimal">
+<li>Write an R script to collect simulation results from output files and print average MSEs in a table of format</li>
 </ol>
 <table>
 <thead>
@@ -885,6 +937,42 @@ cat runSim.R
 </tr>
 </tbody>
 </table>
+<p><strong>solution:</strong></p>
+<ul>
+<li><p>This is my <code>PrintSim.R</code> code:</p>
+<pre class="bash"><code>cat PrintSim.R</code></pre>
+<pre><code>## ## collect simulation results from output files and print average MSEs in a table
+## 
+## datalist &lt;- c()
+## info &lt;- c()
+## N &lt;- c()
+## 
+## # sample sizes/ distributions
+## nVals &lt;- seq(100, 500, by=100)
+## distTypes &lt;- c(&quot;gaussian&quot;, &quot;t1&quot;, &quot;t5&quot;)
+## 
+## for (dist in distTypes){
+##   for (n in nVals){
+##     filename &lt;- paste(&quot;n_&quot;, n, &quot;_dist_&quot;, dist, &quot;.txt&quot;, sep=&quot;&quot;)
+##     datalist &lt;- read.delim(filename)
+##     datalist &lt;- datalist[ , 2]
+##     info &lt;- c(info, datalist)
+##     # the first column of the table
+##     N &lt;- c(N, rep(n, 2))
+##   }
+## }
+## N &lt;- N[1: 10]
+## # the second column of the table
+## Method &lt;- c(&quot;PrimeAvg&quot;, &quot;SampleAvg&quot;)
+## Method &lt;- rep(Method, 5)
+## # the table
+## table &lt;- data.frame(n = N, Method = Method, Gaussian = info[1: 10], t5 = info[21: 30], t1 = info[11: 20])
+## 
+## # print the table
+## print(table)</code></pre></li>
+<li><p>Write output to appropriately named files:</p>
+<pre class="bash"><code>Rscript PrintSim.R</code></pre></li>
+</ul>
 </div>
 
 
