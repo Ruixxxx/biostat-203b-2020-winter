@@ -289,17 +289,19 @@ library(lubridate)
 - death
 
     ```{r}
-    people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
-    enth <- people %>%
-      group_by(ETHNICITY) %>%
-      summarise(
-        count = n()
+    death <- admission %>%
+      summarise(sum(is.na(DEATHTIME))
       ) %>% as.data.frame
-    label_value <- paste('(', round(enth$count / sum(enth$count)
-                                    * 100, 1), '%)', sep = '')
-    label <- paste(enth$ETHNICITY, label_value, sep = '')
-    people %>%
-      ggplot(mapping = aes(x = 'portion', fill = ETHNICITY)) +
+    notdeath <- admission %>%
+      summarise(sum(!is.na(DEATHTIME))
+      ) %>% as.data.frame
+    Death <- data.frame(count = c(death[[1]], notdeath[[1]]))
+    label_value <- paste('(', round(Death$count / sum(Death$count) * 100,
+                                    1), '%)', sep = '')
+    label <- paste("DEATH", "NOTDEATH")
+    label <- paste(label, label_value, sep = '')
+    as_tibble(Death) %>%
+      ggplot(mapping = aes(x = 'portion', fill = count)) +
       geom_bar(width = 1) +
       coord_polar("y") +
       labs(x = '', y = '', title = '') +
@@ -314,6 +316,55 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
 
 - gender  
 - age at admission 
+
+**solution:**
+
+### Link the data
+
+    ```{r}
+    admission <- read_csv("/home/203bdata/mimic-iii/ADMISSIONS.csv",
+                         col_types = cols(ROW_ID = col_integer(),
+                                          SUBJECT_ID = col_integer(),
+                                          HADM_ID = col_integer(),
+                                          HOSPITAL_EXPIRE_FLAG = col_logical(),
+                                          HAS_CHARTEVENTS_DATA = col_logical()))
+    patient <- read_csv("/home/203bdata/mimic-iii/PATIENTS.csv")
+    adm_pinfo <- left_join(admission, patient, by = "SUBJECT_ID")
+    adm_pinfo %>% print(width = Inf)
+    ```
+
+### Graphs
+
+- gender
+
+    ```{r}
+    adm_gender <- adm_pinfo %>%
+      group_by(GENDER) %>%
+      summarise(
+        count = n()
+      ) %>% as.data.frame
+    label_value <- paste('(', round(adm_gender$count / sum(adm_gender$count) * 100,
+                                    1), '%)', sep = '')
+    label <- paste(adm_gender$GENDER, label_value, sep = '')
+    adm_pinfo %>%
+      ggplot(mapping = aes(x = 'portion', fill = GENDER)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+    ```
+
+- age at admission
+
+    ```{r}
+    adm_pinfo %>%
+      mutate(AGE = as.numeric(as.duration(ADMITTIME - DOB) / 31536000)) %>%
+      ggplot(aes(x = AGE)) +
+      geom_freqpoly() +
+      labs(x = "Age at admission")
+    ```
 
 ## Q3
 
