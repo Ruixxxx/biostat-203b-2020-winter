@@ -53,12 +53,8 @@ library(lubridate)
 
 ### Import data
 
-- Let's turn flat files into tibble:
-    ```{bash}
-    head /home/203bdata/mimic-iii/ADMISSIONS.csv
-    ```
-    
-- 
+Let's turn flat files into tibble:
+
     ```{r}
     admission <- read_csv("/home/203bdata/mimic-iii/ADMISSIONS.csv",
                          col_types = cols(ROW_ID = col_integer(),
@@ -71,7 +67,9 @@ library(lubridate)
 
 ### Graphs
 
-- admission year
+#### admission year
+
+Based on each admission record, the admission year is treated as a continuous variable. In general, the amount of patients admitted every year does not have much difference.
  
     ```{r}
     admission %>%
@@ -80,7 +78,9 @@ library(lubridate)
       labs(x = "Admission year")
     ```
     
-- admission month
+#### admission month
+
+Based on each admission record, the admission month is treated as a discrete variable. In general, the amount of patients admitted every month does not have much difference.
 
     ```{r}
     admission %>%
@@ -90,7 +90,9 @@ library(lubridate)
       labs(x = "Admission month")
     ```
 
-- admission weekday
+#### admission weekday
+
+Based on each admission record, the admission weekday is treated as a discrete variable. In general, the hospital is busier during workday than during weekend.
 
     ```{r}
     admission %>%
@@ -100,7 +102,9 @@ library(lubridate)
       labs(x = "Admission weekday")
     ```
 
-- admission hour
+#### admission hour
+
+Based on each admission record, the admission hour is treated as a discrete variable. In general, the admission hour has a peak value around 7 am and the hosiptal is busier during afternoon.
 
     ```{r}
     admission %>%
@@ -110,7 +114,9 @@ library(lubridate)
       labs(x = "Admission hour")
     ```
     
-- length of hospital stay
+#### length of hospital stay
+
+Based on each admission record, the length of hospital stay is treated as a discrete variable. In general, most of the patients stay in the hospital less than 25 days.
 
     ```{r}
     admission %>%
@@ -121,7 +127,9 @@ library(lubridate)
       labs(x = "Length of hospital stay (days)")
     ```
     
-- admission type
+#### admission type
+
+Based on each admission record, the admission type is treated as a discrete variable. The most admission type is emergency and the least admission type is urgent.
 
     ```{r}
     adm_type <- admission %>%
@@ -142,7 +150,9 @@ library(lubridate)
       scale_fill_discrete(labels = label)
     ```
 
-- number of admissions per patient
+#### number of admissions per patient
+
+Based on each unique patient, the number of admissions per patient is treated as a discrete variable. Most of the patients are only admitted to the hospital once.
 
     ```{r}
     adm_num <- admission %>%
@@ -156,18 +166,26 @@ library(lubridate)
       labs(x = "number of admissions per patient")
     ```
 
-- admission location
+#### admission location
+
+Based on each admission record, the admission location is treated as a discrete variable. The most admission location is emergency room admit, which corresponds to the most admission type.
 
     ```{r}
-    adm_loc <- admission %>%
+    adm_loc1 <- admission %>%
       group_by(ADMISSION_LOCATION) %>%
       summarise(
         count = n()
-      ) %>% as.data.frame
+      ) %>%
+      filter(count > 600)
+    adm_loc2 <- admission %>%
+      group_by(ADMISSION_LOCATION) %>%
+      summarise(count = n()) %>%
+      filter(count <= 600)
+    adm_loc <- bind_rows(adm_loc1, adm_loc2) %>% as.data.frame
     label_value <- paste('(', round(adm_loc$count / sum(adm_loc$count) * 100,
                                     1), '%)', sep = '')
     label <- paste(adm_loc$ADMISSION_LOCATION, label_value, sep = '')
-    admission %>%
+    adm_loc %>%
       ggplot(mapping = aes(x = 'portion', fill = ADMISSION_LOCATION)) +
       geom_bar(width = 1) +
       coord_polar("y") +
@@ -177,7 +195,9 @@ library(lubridate)
       scale_fill_discrete(labels = label)
     ```
 
-- insurance
+#### insurance
+
+Based on each unique patient, we can get a sense of the insurance distribution. The insurance is treated as a discrete variable. Most of the patients use medicare and least of the patients use pay by themselves.
 
     ```{r}
     people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
@@ -199,15 +219,23 @@ library(lubridate)
       scale_fill_discrete(labels = label)
     ```
 
-- language
+#### language
+
+Based on each unique patient, we can get a sense of the language distribution. The language is treated as a discrete variable. Most of the patients speak English.
 
     ```{r}
     people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
-    language <- people %>%
+    language1 <- people %>%
       group_by(LANGUAGE) %>%
       summarise(
         count = n()
-      ) %>% as.data.frame
+      ) %>%
+      filter(count > 460)
+    language2 <- people %>%
+      group_by(LANGUAGE) %>%
+      summarise(count = n()) %>%
+      filter(count <= 460)
+    language <- bind_rows(language1, language2) %>% as.data.frame
     label_value <- paste('(', round(language$count / sum(language$count)
                                     * 100, 1), '%)', sep = '')
     label <- paste(language$LANGUAGE, label_value, sep = '')
@@ -221,15 +249,23 @@ library(lubridate)
       scale_fill_discrete(labels = label)
     ```
 
-- religion
+#### religion
+
+Based on each unique patient, we can get a sense of the religion distribution. The religion is treated as a discrete variable. Most of the patients are catholic.
 
     ```{r}
     people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
-    religion <- people %>%
+    religion1 <- people %>%
       group_by(RELIGION) %>%
       summarise(
         count = n()
-      ) %>% as.data.frame
+      ) %>%
+      filter(count > 460)
+    religion2 <- people %>%
+      group_by(RELIGION) %>%
+      summarise(count = n()) %>%
+      filter(count <= 460)
+    religion <- bind_rows(religion1, religion2) %>% as.data.frame
     label_value <- paste('(', round(religion$count / sum(religion$count)
                                     * 100, 1), '%)', sep = '')
     label <- paste(religion$RELIGION, label_value, sep = '')
@@ -243,7 +279,9 @@ library(lubridate)
       scale_fill_discrete(labels = label)
     ```
 
-- martial status
+#### martial status
+
+Based on each unique patient, we can get a sense of the martial status distribution. The martial status is treated as a discrete variable. Most of the patients are married.
 
     ```{r}
     people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
@@ -265,7 +303,9 @@ library(lubridate)
       scale_fill_discrete(labels = label)
     ```
 
-- ethnicity
+#### ethnicity
+
+Based on each unique patient, we can get a sense of the ethnicity distribution. The ethnicity is treated as a discrete variable. Most of the patients are white.
 
     ```{r}
     people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
@@ -287,7 +327,9 @@ library(lubridate)
       scale_fill_discrete(labels = label)
     ```
 
-- death
+#### death
+
+Since the death analysis for each admission makes more sense than the death analysis for each person, the death analysis is based on each admission record. 
 
     ```{r}
     death <- admission %>%
