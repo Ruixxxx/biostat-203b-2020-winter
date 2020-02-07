@@ -319,7 +319,7 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
 
 **solution:**
 
-### Link the data
+### Import data and link the data
 
     ```{r}
     admission <- read_csv("/home/203bdata/mimic-iii/ADMISSIONS.csv",
@@ -373,7 +373,81 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
 - length of ICU stay  
 - first ICU unit  
 - gender  
-- age  
+- age
+
+**solution:**
+
+### Import data and link the data
+
+    ```{r}
+    patient <- read_csv("/home/203bdata/mimic-iii/PATIENTS.csv")
+    icustays <- read_csv("/home/203bdata/mimic-iii/ICUSTAYS.csv")
+    icustay <- left_join(icustays, patient, by = "SUBJECT_ID")
+    icustay %>% print(width = Inf)
+    ```
+
+### Graphs
+
+- length of ICU stay
+
+    ```{r}
+    icustay %>%
+      mutate(los_days = as.numeric(as.duration(OUTTIME - INTIME) / 86400)) %>%
+      ggplot(aes(x = los_days)) +
+      geom_histogram(bins = 100) +
+      labs(x = "Length of ICU stay")
+    ```
+
+- first ICU unit
+
+    ```{r}
+    ICUunit <- icustay %>%
+      group_by(FIRST_CAREUNIT) %>%
+      summarise(
+        count = n()
+      ) %>% as.data.frame
+    label_value <- paste('(', round(ICUunit$count / sum(ICUunit$count) * 100,
+                                    1), '%)', sep = '')
+    label <- paste(ICUunit$FIRST_CAREUNIT, label_value, sep = '')
+    icustay %>%
+      ggplot(mapping = aes(x = 'portion', fill = FIRST_CAREUNIT)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+    ```
+
+- gender
+
+    ```{r}
+    gender <- icustay %>%
+      group_by(GENDER) %>%
+      summarise(
+        count = n()
+      ) %>% as.data.frame
+    label_value <- paste('(', round(gender$count / sum(gender$count) * 100,
+                                    1), '%)', sep = '')
+    label <- paste(gender$GENDER, label_value, sep = '')
+    icustay %>%
+      ggplot(mapping = aes(x = 'portion', fill = GENDER)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+    ```
+
+- age
+
+    ```{r}
+    icustay %>%
+      mutate(age = as.numeric(as.duration(INTIME - DOB) / 31536000)) %>%
+      ggplot(aes(x = age)) +
+      geom_freqpoly() +
+      labs(x = "Age at admission")
 
 ## Q4 
 
