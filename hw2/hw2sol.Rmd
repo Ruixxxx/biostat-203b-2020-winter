@@ -364,6 +364,8 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
 
 ### Import data and link the data
 
+Let's turn flat files into tibbles and link the tibbles. `PATIENTS.csv` contains unique patient information. Then through left joint to admission information, every admission record is linked to one patient while the patient information shows up multiple times.
+
     ```{r}
     admission <- read_csv("/home/203bdata/mimic-iii/ADMISSIONS.csv",
                          col_types = cols(ROW_ID = col_integer(),
@@ -378,7 +380,9 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
 
 ### Graphs
 
-- gender
+#### gender
+
+Since the gender analysis for each admission makes more sense than the gender analysis for each person, the gender analysis is based on each admission record. The ratio of male patients to female patients is around 1 and the amount of male patients is larger than the amount of female patients.
 
     ```{r}
     adm_gender <- adm_pinfo %>%
@@ -399,7 +403,9 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
       scale_fill_discrete(labels = label)
     ```
 
-- age at admission
+#### age at admission
+
+Based on each admission record, the age at admission is treated as a continuous variable. The most age at admission is around 75 years old and the newborns also take a big part.
 
     ```{r}
     adm_pinfo %>%
@@ -422,6 +428,8 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
 
 ### Import data and link the data
 
+Let's turn flat files into tibbles and link the tibbles. `PATIENTS.csv` contains unique patient information. Then through left joint to ICU stay information, every ICU admission record is linked to one patient while the patient information shows up multiple times.
+
     ```{r}
     patient <- read_csv("/home/203bdata/mimic-iii/PATIENTS.csv")
     icustays <- read_csv("/home/203bdata/mimic-iii/ICUSTAYS.csv")
@@ -431,7 +439,9 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
 
 ### Graphs
 
-- length of ICU stay
+#### length of ICU stay
+
+Based on each ICU admission record, the length of ICU stay is treated as a discrete variable. Most of the patients stay in the ICU for less than 12 days.
 
     ```{r}
     icustay %>%
@@ -441,7 +451,9 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
       labs(x = "Length of ICU stay")
     ```
 
-- first ICU unit
+#### first ICU unit
+
+Based on each ICU admission record, the first ICU unit is treated as a discrete variable. Most of the patients are admitted to MICU at the beginning.
 
     ```{r}
     ICUunit <- icustay %>%
@@ -462,7 +474,9 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
       scale_fill_discrete(labels = label)
     ```
 
-- gender
+#### gender
+
+Based on each ICU admission record, the gender is treated as a discrete variable. The ratio of male patients to female patients is around 1 and the amount of male patients is larger than the amount of female patients.
 
     ```{r}
     gender <- icustay %>%
@@ -483,7 +497,9 @@ Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.or
       scale_fill_discrete(labels = label)
     ```
 
-- age
+#### age
+
+Based on each ICU admission record, the age at admission is treated as a continuous variable. The most age at admission is around 75 years old and the newborns also take a big part.
 
     ```{r}
     icustay %>%
