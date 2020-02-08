@@ -421,8 +421,7 @@ Since the gender analysis for each admission makes more sense than the gender an
       summarise(
         count = n()
       ) %>% as.data.frame
-    label_value <- paste('(', round(adm_gender$count / sum(adm_gender$count) * 100,
-                                    1), '%)', sep = '')
+    label_value <- paste('(', round(adm_gender$count / sum(adm_gender$count) *                               100, 1), '%)', sep = '')
     label <- paste(adm_gender$GENDER, label_value, sep = '')
     adm_pinfo %>%
       ggplot(mapping = aes(x = 'portion', fill = GENDER)) +
@@ -436,7 +435,7 @@ Since the gender analysis for each admission makes more sense than the gender an
 
 #### age at admission
 
-Based on each admission record, the age at admission is treated as a continuous variable. The most age at admission is around 75 years old and the newborns also take a big part.
+Based on each admission record, the age at admission is treated as a continuous variable. The newborns take the largest part and people arount 75 years old also take a big part.
 
 ```{r}
     adm_pinfo %>%
@@ -459,7 +458,7 @@ Based on each admission record, the age at admission is treated as a continuous 
 
 ### Import data and link the data
 
-Let's turn flat files into tibbles and link the tibbles. `PATIENTS.csv` contains unique patient information. Then through left joint to ICU stay information, every ICU admission record is linked to one patient while the patient information shows up multiple times.
+Let's turn flat files into tibbles and link the tibbles. `PATIENTS.csv` contains unique patient information. Then through left joint to ICU stay information, every ICU stay record is linked to one patient while the patient information shows up multiple times.
 
 ```{r}
     patient <- read_csv("/home/203bdata/mimic-iii/PATIENTS.csv")
@@ -472,7 +471,7 @@ Let's turn flat files into tibbles and link the tibbles. `PATIENTS.csv` contains
 
 #### length of ICU stay
 
-Based on each ICU admission record, the length of ICU stay is treated as a discrete variable. Most of the patients stay in the ICU for less than 12 days.
+Based on each ICU stay record, the length of ICU stay is treated as a discrete variable. Most of the patients stay in the ICU for less than 12 days.
 
 ```{r}
     icustay %>%
@@ -484,7 +483,7 @@ Based on each ICU admission record, the length of ICU stay is treated as a discr
 
 #### first ICU unit
 
-Based on each ICU admission record, the first ICU unit is treated as a discrete variable. Most of the patients are admitted to MICU at the beginning.
+Based on each ICU stay record, the first ICU unit is treated as a discrete variable. Most of the patients are admitted to MICU at the beginning.
 
 ```{r}
     ICUunit <- icustay %>%
@@ -507,7 +506,7 @@ Based on each ICU admission record, the first ICU unit is treated as a discrete 
 
 #### gender
 
-Based on each ICU admission record, the gender is treated as a discrete variable. The ratio of male patients to female patients is around 1 and the amount of male patients is larger than the amount of female patients.
+Based on each ICU stay record, the gender is treated as a discrete variable. The ratio of male patients to female patients is around 1 and the amount of male patients is larger than the amount of female patients.
 
 ```{r}
     gender <- icustay %>%
@@ -530,7 +529,7 @@ Based on each ICU admission record, the gender is treated as a discrete variable
 
 #### age
 
-Based on each ICU admission record, the age at admission is treated as a continuous variable. The most age at admission is around 75 years old and the newborns also take a big part.
+Based on each ICU stay record, the age at admission is treated as a continuous variable. The newborns take the largest part and people arount 75 years old also take a big part.
 
 ```{r}
     icustay %>%

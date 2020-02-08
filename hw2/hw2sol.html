@@ -994,8 +994,7 @@ summary {
       summarise(
         count = n()
       ) %&gt;% as.data.frame
-    label_value &lt;- paste('(', round(adm_gender$count / sum(adm_gender$count) * 100,
-                                    1), '%)', sep = '')
+    label_value &lt;- paste('(', round(adm_gender$count / sum(adm_gender$count) *                               100, 1), '%)', sep = '')
     label &lt;- paste(adm_gender$GENDER, label_value, sep = '')
     adm_pinfo %&gt;%
       ggplot(mapping = aes(x = 'portion', fill = GENDER)) +
@@ -1009,7 +1008,7 @@ summary {
 </div>
 <div id="age-at-admission" class="section level4">
 <h4>age at admission</h4>
-<p>Based on each admission record, the age at admission is treated as a continuous variable. The most age at admission is around 75 years old and the newborns also take a big part.</p>
+<p>Based on each admission record, the age at admission is treated as a continuous variable. The newborns take the largest part and people arount 75 years old also take a big part.</p>
 <pre class="r"><code>    adm_pinfo %&gt;%
       mutate(AGE = as.numeric(as.duration(ADMITTIME - DOB) / 31536000)) %&gt;%
       ggplot(aes(x = AGE)) +
@@ -1034,7 +1033,7 @@ summary {
 <p><strong>solution:</strong></p>
 <div id="import-data-and-link-the-data-1" class="section level3">
 <h3>Import data and link the data</h3>
-<p>Let’s turn flat files into tibbles and link the tibbles. <code>PATIENTS.csv</code> contains unique patient information. Then through left joint to ICU stay information, every ICU admission record is linked to one patient while the patient information shows up multiple times.</p>
+<p>Let’s turn flat files into tibbles and link the tibbles. <code>PATIENTS.csv</code> contains unique patient information. Then through left joint to ICU stay information, every ICU stay record is linked to one patient while the patient information shows up multiple times.</p>
 <pre class="r"><code>    patient &lt;- read_csv(&quot;/home/203bdata/mimic-iii/PATIENTS.csv&quot;)</code></pre>
 <pre><code>## Parsed with column specification:
 ## cols(
@@ -1120,7 +1119,7 @@ summary {
 <h3>Graphs</h3>
 <div id="length-of-icu-stay" class="section level4">
 <h4>length of ICU stay</h4>
-<p>Based on each ICU admission record, the length of ICU stay is treated as a discrete variable. Most of the patients stay in the ICU for less than 12 days.</p>
+<p>Based on each ICU stay record, the length of ICU stay is treated as a discrete variable. Most of the patients stay in the ICU for less than 12 days.</p>
 <pre class="r"><code>    icustay %&gt;%
       mutate(los_days = as.numeric(as.duration(OUTTIME - INTIME) / 86400)) %&gt;%
       ggplot(aes(x = los_days)) +
@@ -1131,7 +1130,7 @@ summary {
 </div>
 <div id="first-icu-unit" class="section level4">
 <h4>first ICU unit</h4>
-<p>Based on each ICU admission record, the first ICU unit is treated as a discrete variable. Most of the patients are admitted to MICU at the beginning.</p>
+<p>Based on each ICU stay record, the first ICU unit is treated as a discrete variable. Most of the patients are admitted to MICU at the beginning.</p>
 <pre class="r"><code>    ICUunit &lt;- icustay %&gt;%
       group_by(FIRST_CAREUNIT) %&gt;%
       summarise(
@@ -1152,7 +1151,7 @@ summary {
 </div>
 <div id="gender-1" class="section level4">
 <h4>gender</h4>
-<p>Based on each ICU admission record, the gender is treated as a discrete variable. The ratio of male patients to female patients is around 1 and the amount of male patients is larger than the amount of female patients.</p>
+<p>Based on each ICU stay record, the gender is treated as a discrete variable. The ratio of male patients to female patients is around 1 and the amount of male patients is larger than the amount of female patients.</p>
 <pre class="r"><code>    gender &lt;- icustay %&gt;%
       group_by(GENDER) %&gt;%
       summarise(
@@ -1173,7 +1172,7 @@ summary {
 </div>
 <div id="age" class="section level4">
 <h4>age</h4>
-<p>Based on each ICU admission record, the age at admission is treated as a continuous variable. The most age at admission is around 75 years old and the newborns also take a big part.</p>
+<p>Based on each ICU stay record, the age at admission is treated as a continuous variable. The newborns take the largest part and people arount 75 years old also take a big part.</p>
 <pre class="r"><code>    icustay %&gt;%
       mutate(age = as.numeric(as.duration(INTIME - DOB) / 31536000)) %&gt;%
       ggplot(aes(x = age)) +
