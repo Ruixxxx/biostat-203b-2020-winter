@@ -44,7 +44,7 @@ Note it is possible that one patient (uniquely identified by the `SUBJECT_ID`) i
 
 ### Prerequisites
 
-Load tidyverse and lubridate
+Load tidyverse and lubridate:
 
 ```{r}
     library(tidyverse)
@@ -552,7 +552,7 @@ Compile a tibble that contains the first ICU stay of unique patients, with the p
 
 ### Prerequisites
 
-Load htmlwidgets
+Load htmlwidgets:
 
 ```{r}
     library(htmlwidgets)
@@ -580,7 +580,7 @@ Load htmlwidgets
 
 ### Compile the tibble
 
-- Select the systolic blood pressure measurement information:
+- Select the first systolic blood pressure measurement information. First, find potential values of `ITEMID` that correspond to systolic blood pressure. Then, substract the systolic blood pressure measurement information from `CHARTEVENTS.csv` and choose the first systolic blood pressure measurement based on the `CHARTTIME` for each unique patient. Only keep the `SUBJECT_ID` and the corresponding first systolic blood pressure measurement information.
 
 ```{r}
     bloodp <- item %>%
@@ -588,39 +588,39 @@ Load htmlwidgets
       select(ITEMID, LABEL)
     bloodp2 <- inner_join(chart, bloodp, by = "ITEMID") %>%
       group_by(SUBJECT_ID) %>%
-      filter(rank(STORETIME) == 1) %>%
-      select(SUBJECT_ID, HADM_ID, LABEL)
+      filter(rank(CHARTTIME) == 1) %>%
+      select(SUBJECT_ID, LABEL)
     bloodp2 %>% print(width = Inf)
 ```
 
-- select the ICU stay information:
+- Select the first ICU stay information of unique patients. Based on the `INTIME`, choose the first ICU stay of each unique patient from `ICUSTAYS.csv`. Only keep the `SUBJECT_ID` and the corresponding first ICU stay information.
 
 ```{r}
     first_icu <- icustay %>%
       group_by(SUBJECT_ID) %>%
       filter(rank(INTIME) == 1) %>%
-      select(SUBJECT_ID, HADM_ID, FIRST_CAREUNIT)
+      select(SUBJECT_ID, FIRST_CAREUNIT)
     first_icu %>% print(width = Inf)
 ```
 
-- Select the patient's demographic and death information:
+- Select the patient's demographic and death information. First, through left joint patient information to admission information, every admission record is linked to one patient while the patient information shows up multiple times. Then, based on the information, whether the patient died within 30 days of hospital admission can be determined. Substract information for each unique patient. For each unique patient, once one admission record shows that the patient died within 30 days, this death information is kept. Only keep the `SUBJECT_ID` and the corresponding demographic and death information.
 
 ```{r}
-    pinfo <- admission %>%
+    pinfo <- left_join(admission, patient, by = "SUBJECT_ID") %>%
       mutate(dead30 = ((as.numeric(as.duration(DEATHTIME - ADMITTIME) / 86400)
                                   ) <= 30)) %>%
       group_by(SUBJECT_ID) %>%
       filter(rank(desc(dead30)) == 1) %>%
-      select(SUBJECT_ID, HADM_ID, LANGUAGE: ETHNICITY, dead30)
+      select(SUBJECT_ID, LANGUAGE: ETHNICITY, GENDER, DOB, dead30)
     pinfo %>% print(width = Inf)
 ```
 
-- compile the tibble
+- Compile the tibble. Full join all the information kept above by `SUBJECT_ID`. Then we get a tibble that contains the first ICU stay of unique patients, with the patient’s demographic information, the first systolic blood pressure measurement during ICU stay, and whether the patient died within 30 days of hospitcal admission.
 
 ```{r}
     info <- pinfo %>%
-      full_join(bloodp2, by = "HADM_ID") %>%
-      full_join(first_icu, by = "HADM_ID")
+      full_join(bloodp2, by = "SUBJECT_ID") %>%
+      full_join(first_icu, by = "SUBJECT_ID")
     info %>% print(width = Inf)
 ```
 

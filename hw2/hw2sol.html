@@ -489,7 +489,7 @@ summary {
 <p><strong>solution:</strong></p>
 <div id="prerequisites" class="section level3">
 <h3>Prerequisites</h3>
-<p>Load tidyverse and lubridate</p>
+<p>Load tidyverse and lubridate:</p>
 <pre class="r"><code>    library(tidyverse)
     library(lubridate)</code></pre>
 </div>
@@ -1190,7 +1190,7 @@ summary {
 <p><strong>solution:</strong></p>
 <div id="prerequisites-1" class="section level3">
 <h3>Prerequisites</h3>
-<p>Load htmlwidgets</p>
+<p>Load htmlwidgets:</p>
 <pre class="r"><code>    library(htmlwidgets)</code></pre>
 </div>
 <div id="import-data-1" class="section level3">
@@ -1458,125 +1458,137 @@ summary {
 <div id="compile-the-tibble" class="section level3">
 <h3>Compile the tibble</h3>
 <ul>
-<li>Select the systolic blood pressure measurement information:</li>
+<li>Select the first systolic blood pressure measurement information. First, find potential values of <code>ITEMID</code> that correspond to systolic blood pressure. Then, substract the systolic blood pressure measurement information from <code>CHARTEVENTS.csv</code> and choose the first systolic blood pressure measurement based on the <code>CHARTTIME</code> for each unique patient. Only keep the <code>SUBJECT_ID</code> and the corresponding first systolic blood pressure measurement information.</li>
 </ul>
 <pre class="r"><code>    bloodp &lt;- item %&gt;%
       filter(str_detect(LABEL, &quot;systolic&quot;)) %&gt;%
       select(ITEMID, LABEL)
     bloodp2 &lt;- inner_join(chart, bloodp, by = &quot;ITEMID&quot;) %&gt;%
       group_by(SUBJECT_ID) %&gt;%
-      filter(rank(STORETIME) == 1) %&gt;%
-      select(SUBJECT_ID, HADM_ID, LABEL)
+      filter(rank(CHARTTIME) == 1) %&gt;%
+      select(SUBJECT_ID, LABEL)
     bloodp2 %&gt;% print(width = Inf)</code></pre>
-<pre><code>## # A tibble: 289 x 3
-## # Groups:   SUBJECT_ID [289]
-##    SUBJECT_ID HADM_ID LABEL                               
-##         &lt;dbl&gt;   &lt;dbl&gt; &lt;chr&gt;                               
-##  1         23  124321 Arterial Blood Pressure systolic    
-##  2         36  165660 Non Invasive Blood Pressure systolic
-##  3         34  144319 Non Invasive Blood Pressure systolic
-##  4         85  112077 Non Invasive Blood Pressure systolic
-##  5        107  182383 Non Invasive Blood Pressure systolic
-##  6        109  124657 Non Invasive Blood Pressure systolic
-##  7        124  138376 Non Invasive Blood Pressure systolic
-##  8        165  170252 Non Invasive Blood Pressure systolic
-##  9        154  102354 Non Invasive Blood Pressure systolic
-## 10        188  123860 Non Invasive Blood Pressure systolic
-## # … with 279 more rows</code></pre>
+<pre><code>## # A tibble: 420 x 2
+## # Groups:   SUBJECT_ID [420]
+##    SUBJECT_ID LABEL                               
+##         &lt;dbl&gt; &lt;chr&gt;                               
+##  1         23 Arterial Blood Pressure systolic    
+##  2         36 Non Invasive Blood Pressure systolic
+##  3         34 Non Invasive Blood Pressure systolic
+##  4         85 Non Invasive Blood Pressure systolic
+##  5        107 Non Invasive Blood Pressure systolic
+##  6        109 Non Invasive Blood Pressure systolic
+##  7        124 Non Invasive Blood Pressure systolic
+##  8        165 Non Invasive Blood Pressure systolic
+##  9        154 Non Invasive Blood Pressure systolic
+## 10        188 Non Invasive Blood Pressure systolic
+## # … with 410 more rows</code></pre>
 <ul>
-<li>select the ICU stay information:</li>
+<li>Select the first ICU stay information of unique patients. Based on the <code>INTIME</code>, choose the first ICU stay of each unique patient from <code>ICUSTAYS.csv</code>. Only keep the <code>SUBJECT_ID</code> and the corresponding first ICU stay information.</li>
 </ul>
 <pre class="r"><code>    first_icu &lt;- icustay %&gt;%
       group_by(SUBJECT_ID) %&gt;%
       filter(rank(INTIME) == 1) %&gt;%
-      select(SUBJECT_ID, HADM_ID, FIRST_CAREUNIT)
+      select(SUBJECT_ID, FIRST_CAREUNIT)
     first_icu %&gt;% print(width = Inf)</code></pre>
-<pre><code>## # A tibble: 46,476 x 3
+<pre><code>## # A tibble: 46,476 x 2
 ## # Groups:   SUBJECT_ID [46,476]
-##    SUBJECT_ID HADM_ID FIRST_CAREUNIT
-##         &lt;dbl&gt;   &lt;dbl&gt; &lt;chr&gt;         
-##  1        268  110404 MICU          
-##  2        269  106296 MICU          
-##  3        270  188028 CCU           
-##  4        271  173727 MICU          
-##  5        272  164716 CCU           
-##  6        273  158689 MICU          
-##  7        274  130546 MICU          
-##  8        275  129886 CCU           
-##  9        276  135156 CCU           
-## 10        277  171601 NICU          
+##    SUBJECT_ID FIRST_CAREUNIT
+##         &lt;dbl&gt; &lt;chr&gt;         
+##  1        268 MICU          
+##  2        269 MICU          
+##  3        270 CCU           
+##  4        271 MICU          
+##  5        272 CCU           
+##  6        273 MICU          
+##  7        274 MICU          
+##  8        275 CCU           
+##  9        276 CCU           
+## 10        277 NICU          
 ## # … with 46,466 more rows</code></pre>
 <ul>
-<li>Select the patient’s demographic and death information:</li>
+<li>Select the patient’s demographic and death information. First, through left joint patient information to admission information, every admission record is linked to one patient while the patient information shows up multiple times. Then, based on the information, whether the patient died within 30 days of hospital admission can be determined. Substract information for each unique patient. For each unique patient, once one admission record shows that the patient died within 30 days, this death information is kept. Only keep the <code>SUBJECT_ID</code> and the corresponding demographic and death information.</li>
 </ul>
-<pre class="r"><code>    pinfo &lt;- admission %&gt;%
+<pre class="r"><code>    pinfo &lt;- left_join(admission, patient, by = &quot;SUBJECT_ID&quot;) %&gt;%
       mutate(dead30 = ((as.numeric(as.duration(DEATHTIME - ADMITTIME) / 86400)
                                   ) &lt;= 30)) %&gt;%
       group_by(SUBJECT_ID) %&gt;%
       filter(rank(desc(dead30)) == 1) %&gt;%
-      select(SUBJECT_ID, HADM_ID, LANGUAGE: ETHNICITY, dead30)
+      select(SUBJECT_ID, LANGUAGE: ETHNICITY, GENDER, DOB, dead30)
     pinfo %&gt;% print(width = Inf)</code></pre>
-<pre><code>## # A tibble: 46,480 x 7
+<pre><code>## # A tibble: 46,480 x 8
 ## # Groups:   SUBJECT_ID [46,480]
-##    SUBJECT_ID HADM_ID LANGUAGE RELIGION          MARITAL_STATUS
-##         &lt;int&gt;   &lt;int&gt; &lt;chr&gt;    &lt;chr&gt;             &lt;chr&gt;         
-##  1         22  165315 &lt;NA&gt;     UNOBTAINABLE      MARRIED       
-##  2         23  152223 &lt;NA&gt;     CATHOLIC          MARRIED       
-##  3         24  161859 &lt;NA&gt;     PROTESTANT QUAKER SINGLE        
-##  4         25  129635 &lt;NA&gt;     UNOBTAINABLE      MARRIED       
-##  5         26  197661 &lt;NA&gt;     CATHOLIC          SINGLE        
-##  6         27  134931 &lt;NA&gt;     CATHOLIC          &lt;NA&gt;          
-##  7         28  162569 &lt;NA&gt;     CATHOLIC          MARRIED       
-##  8         30  104557 &lt;NA&gt;     CATHOLIC          MARRIED       
-##  9         31  128652 &lt;NA&gt;     CATHOLIC          MARRIED       
-## 10         32  175413 &lt;NA&gt;     UNOBTAINABLE      &lt;NA&gt;          
-##    ETHNICITY             dead30
-##    &lt;chr&gt;                 &lt;lgl&gt; 
-##  1 WHITE                 NA    
-##  2 WHITE                 NA    
-##  3 WHITE                 NA    
-##  4 WHITE                 NA    
-##  5 UNKNOWN/NOT SPECIFIED NA    
-##  6 WHITE                 NA    
-##  7 WHITE                 NA    
-##  8 UNKNOWN/NOT SPECIFIED NA    
-##  9 WHITE                 TRUE  
-## 10 WHITE                 NA    
+##    SUBJECT_ID LANGUAGE RELIGION          MARITAL_STATUS ETHNICITY            
+##         &lt;dbl&gt; &lt;chr&gt;    &lt;chr&gt;             &lt;chr&gt;          &lt;chr&gt;                
+##  1         22 &lt;NA&gt;     UNOBTAINABLE      MARRIED        WHITE                
+##  2         23 &lt;NA&gt;     CATHOLIC          MARRIED        WHITE                
+##  3         24 &lt;NA&gt;     PROTESTANT QUAKER SINGLE         WHITE                
+##  4         25 &lt;NA&gt;     UNOBTAINABLE      MARRIED        WHITE                
+##  5         26 &lt;NA&gt;     CATHOLIC          SINGLE         UNKNOWN/NOT SPECIFIED
+##  6         27 &lt;NA&gt;     CATHOLIC          &lt;NA&gt;           WHITE                
+##  7         28 &lt;NA&gt;     CATHOLIC          MARRIED        WHITE                
+##  8         30 &lt;NA&gt;     CATHOLIC          MARRIED        UNKNOWN/NOT SPECIFIED
+##  9         31 &lt;NA&gt;     CATHOLIC          MARRIED        WHITE                
+## 10         32 &lt;NA&gt;     UNOBTAINABLE      &lt;NA&gt;           WHITE                
+##    GENDER DOB                 dead30
+##    &lt;chr&gt;  &lt;dttm&gt;              &lt;lgl&gt; 
+##  1 F      2131-05-07 00:00:00 NA    
+##  2 M      2082-07-17 00:00:00 NA    
+##  3 M      2100-05-31 00:00:00 NA    
+##  4 M      2101-11-21 00:00:00 NA    
+##  5 M      2054-05-04 00:00:00 NA    
+##  6 F      2191-11-30 00:00:00 NA    
+##  7 M      2103-04-15 00:00:00 NA    
+##  8 M      1872-10-14 00:00:00 NA    
+##  9 M      2036-05-17 00:00:00 TRUE  
+## 10 M      2124-09-29 00:00:00 NA    
 ## # … with 46,470 more rows</code></pre>
 <ul>
-<li>compile the tibble</li>
+<li>Compile the tibble. Full join all the information kept above by <code>SUBJECT_ID</code>. Then we get a tibble that contains the first ICU stay of unique patients, with the patient’s demographic information, the first systolic blood pressure measurement during ICU stay, and whether the patient died within 30 days of hospitcal admission.</li>
 </ul>
 <pre class="r"><code>    info &lt;- pinfo %&gt;%
-      full_join(bloodp2, by = &quot;HADM_ID&quot;) %&gt;%
-      full_join(first_icu, by = &quot;HADM_ID&quot;)
+      full_join(bloodp2, by = &quot;SUBJECT_ID&quot;) %&gt;%
+      full_join(first_icu, by = &quot;SUBJECT_ID&quot;)
     info %&gt;% print(width = Inf)</code></pre>
-<pre><code>## # A tibble: 48,644 x 11
-## # Groups:   SUBJECT_ID.x [46,481]
-##    SUBJECT_ID.x HADM_ID LANGUAGE RELIGION          MARITAL_STATUS
-##           &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;    &lt;chr&gt;             &lt;chr&gt;         
-##  1           22  165315 &lt;NA&gt;     UNOBTAINABLE      MARRIED       
-##  2           23  152223 &lt;NA&gt;     CATHOLIC          MARRIED       
-##  3           24  161859 &lt;NA&gt;     PROTESTANT QUAKER SINGLE        
-##  4           25  129635 &lt;NA&gt;     UNOBTAINABLE      MARRIED       
-##  5           26  197661 &lt;NA&gt;     CATHOLIC          SINGLE        
-##  6           27  134931 &lt;NA&gt;     CATHOLIC          &lt;NA&gt;          
-##  7           28  162569 &lt;NA&gt;     CATHOLIC          MARRIED       
-##  8           30  104557 &lt;NA&gt;     CATHOLIC          MARRIED       
-##  9           31  128652 &lt;NA&gt;     CATHOLIC          MARRIED       
-## 10           32  175413 &lt;NA&gt;     UNOBTAINABLE      &lt;NA&gt;          
-##    ETHNICITY             dead30 SUBJECT_ID.y LABEL SUBJECT_ID FIRST_CAREUNIT
-##    &lt;chr&gt;                 &lt;lgl&gt;         &lt;dbl&gt; &lt;chr&gt;      &lt;dbl&gt; &lt;chr&gt;         
-##  1 WHITE                 NA               NA &lt;NA&gt;          22 MICU          
-##  2 WHITE                 NA               NA &lt;NA&gt;          23 CSRU          
-##  3 WHITE                 NA               NA &lt;NA&gt;          24 CCU           
-##  4 WHITE                 NA               NA &lt;NA&gt;          25 CCU           
-##  5 UNKNOWN/NOT SPECIFIED NA               NA &lt;NA&gt;          26 CCU           
-##  6 WHITE                 NA               NA &lt;NA&gt;          27 NICU          
-##  7 WHITE                 NA               NA &lt;NA&gt;          28 CSRU          
-##  8 UNKNOWN/NOT SPECIFIED NA               NA &lt;NA&gt;          30 CCU           
-##  9 WHITE                 TRUE             NA &lt;NA&gt;          31 MICU          
-## 10 WHITE                 NA               NA &lt;NA&gt;          32 TSICU         
-## # … with 48,634 more rows</code></pre>
+<pre><code>## # A tibble: 46,520 x 10
+## # Groups:   SUBJECT_ID [46,520]
+##    SUBJECT_ID LANGUAGE RELIGION          MARITAL_STATUS ETHNICITY            
+##         &lt;dbl&gt; &lt;chr&gt;    &lt;chr&gt;             &lt;chr&gt;          &lt;chr&gt;                
+##  1         22 &lt;NA&gt;     UNOBTAINABLE      MARRIED        WHITE                
+##  2         23 &lt;NA&gt;     CATHOLIC          MARRIED        WHITE                
+##  3         24 &lt;NA&gt;     PROTESTANT QUAKER SINGLE         WHITE                
+##  4         25 &lt;NA&gt;     UNOBTAINABLE      MARRIED        WHITE                
+##  5         26 &lt;NA&gt;     CATHOLIC          SINGLE         UNKNOWN/NOT SPECIFIED
+##  6         27 &lt;NA&gt;     CATHOLIC          &lt;NA&gt;           WHITE                
+##  7         28 &lt;NA&gt;     CATHOLIC          MARRIED        WHITE                
+##  8         30 &lt;NA&gt;     CATHOLIC          MARRIED        UNKNOWN/NOT SPECIFIED
+##  9         31 &lt;NA&gt;     CATHOLIC          MARRIED        WHITE                
+## 10         32 &lt;NA&gt;     UNOBTAINABLE      &lt;NA&gt;           WHITE                
+##    GENDER DOB                 dead30 LABEL                           
+##    &lt;chr&gt;  &lt;dttm&gt;              &lt;lgl&gt;  &lt;chr&gt;                           
+##  1 F      2131-05-07 00:00:00 NA     &lt;NA&gt;                            
+##  2 M      2082-07-17 00:00:00 NA     Arterial Blood Pressure systolic
+##  3 M      2100-05-31 00:00:00 NA     &lt;NA&gt;                            
+##  4 M      2101-11-21 00:00:00 NA     &lt;NA&gt;                            
+##  5 M      2054-05-04 00:00:00 NA     &lt;NA&gt;                            
+##  6 F      2191-11-30 00:00:00 NA     &lt;NA&gt;                            
+##  7 M      2103-04-15 00:00:00 NA     &lt;NA&gt;                            
+##  8 M      1872-10-14 00:00:00 NA     &lt;NA&gt;                            
+##  9 M      2036-05-17 00:00:00 TRUE   &lt;NA&gt;                            
+## 10 M      2124-09-29 00:00:00 NA     &lt;NA&gt;                            
+##    FIRST_CAREUNIT
+##    &lt;chr&gt;         
+##  1 MICU          
+##  2 CSRU          
+##  3 CCU           
+##  4 CCU           
+##  5 CCU           
+##  6 NICU          
+##  7 CSRU          
+##  8 CCU           
+##  9 MICU          
+## 10 TSICU         
+## # … with 46,510 more rows</code></pre>
 </div>
 </div>
 
