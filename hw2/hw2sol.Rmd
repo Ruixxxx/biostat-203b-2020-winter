@@ -1,0 +1,630 @@
+---
+title: "Biostat 203B Homework 2"
+author: Rui Xu
+subtitle: Due Feb 7 @ 11:59PM
+output:
+  # ioslides_presentation: default
+  html_document:
+      toc: true
+      toc_depth: 4
+---
+
+```{r setup, include=FALSE}
+    knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+```{r}
+    sessionInfo()
+```
+
+Use tidyverse (ggpot2, dplyr) to explore the [MIMIC-III](https://mimic.physionet.org) data introduced in [homework 1](https://ucla-biostat203b-2020winter.github.io/hw/hw1/hw1.html).
+
+## Q1
+
+Demographic information of the patients admitted into hospital is available in `ADMISSION.csv`. See <https://mimic.physionet.org/mimictables/admissions/> for details of each field in this file. Summarize following variables using appropriate graphs:   
+
+  - admission year  
+- admission month  
+- admission week day  
+- admission hour  
+- length of hospital stay  
+- admission type  
+- number of admissions per patient  
+- admission location  
+- insurance  
+- language  
+- religion  
+- martial status  
+- ethnicity  
+- death 
+
+Note it is possible that one patient (uniquely identified by the `SUBJECT_ID`) is admitted into hospital multiple times. When summarizing some demographic information, it makes sense to summarize based on only unique patients. 
+
+**solution:**
+
+### Prerequisites
+
+Load tidyverse and lubridate:
+
+```{r}
+    library(tidyverse)
+    library(lubridate)
+```
+
+### Import data
+
+Let's turn flat files into tibble:
+
+```{r}
+    admission <- read_csv("/home/203bdata/mimic-iii/ADMISSIONS.csv",
+                     col_types = cols(ROW_ID = col_integer(),
+                                      SUBJECT_ID = col_integer(),
+                                      HADM_ID = col_integer(),
+                                      HOSPITAL_EXPIRE_FLAG = col_logical(),
+                                      HAS_CHARTEVENTS_DATA = col_logical()))
+    admission %>% print(width = Inf)
+```
+
+### Graphs
+
+#### admission year
+
+Based on each admission record, the admission year is treated as a continuous variable. In general, the amount of patients admitted every year does not have much difference.
+ 
+```{r}
+    admission %>%
+      ggplot(aes(x = ADMITTIME)) +
+      geom_freqpoly(binwidth = 31536000) + # 86400 seconds = 1 day
+      labs(x = "Admission year")
+```
+    
+#### admission month
+
+Based on each admission record, the admission month is treated as a discrete variable. In general, the amount of patients admitted every month does not have much difference.
+
+```{r}
+    admission %>%
+      mutate(adm_month = month(ADMITTIME, label = TRUE)) %>%
+      ggplot(aes(x = adm_month)) +
+      geom_bar() +
+      labs(x = "Admission month")
+```
+
+#### admission weekday
+
+Based on each admission record, the admission weekday is treated as a discrete variable. In general, the hospital is busier during workday than during weekend.
+
+```{r}
+    admission %>%
+      mutate(adm_wday = wday(ADMITTIME, label = TRUE)) %>%
+      ggplot(aes(x = adm_wday)) +
+      geom_bar() +
+      labs(x = "Admission weekday")
+```
+
+#### admission hour
+
+Based on each admission record, the admission hour is treated as a discrete variable. In general, the admission hour has a peak value around 7 am and the hosiptal is busier during afternoon.
+
+```{r}
+    admission %>%
+      mutate(adm_hour = hour(ADMITTIME)) %>%
+      ggplot(aes(x = adm_hour)) +
+      geom_bar() +
+      labs(x = "Admission hour")
+```
+    
+#### length of hospital stay
+
+Based on each admission record, the length of hospital stay is treated as a discrete variable. In general, most of the patients stay in the hospital less than 25 days.
+
+```{r}
+    admission %>%
+      mutate(los_days = as.numeric(as.duration(DISCHTIME - ADMITTIME) 
+                                 / 86400)) %>%
+      ggplot(aes(x = los_days)) +
+      geom_histogram(bins = 100) +
+      labs(x = "Length of hospital stay (days)")
+```
+    
+#### admission type
+
+Based on each admission record, the admission type is treated as a discrete variable. The most admission type is emergency and the least admission type is urgent.
+
+```{r}
+    adm_type <- admission %>%
+      group_by(ADMISSION_TYPE) %>%
+      summarise(
+        count = n()
+      ) %>% as.data.frame
+    label_value <- paste('(', round(adm_type$count / sum(adm_type$count) * 100,
+                                    1), '%)', sep = '')
+    label <- paste(adm_type$ADMISSION_TYPE, label_value, sep = '')
+    admission %>%
+      ggplot(mapping = aes(x = 'portion', fill = ADMISSION_TYPE)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+```
+
+#### number of admissions per patient
+
+Based on each unique patient, the number of admissions per patient is treated as a discrete variable. Most of the patients are only admitted to the hospital once.
+
+```{r}
+    adm_num <- admission %>%
+       group_by(SUBJECT_ID) %>%
+       summarise(
+         count = n()
+       )
+    adm_num %>%
+      ggplot(aes(x = count)) +
+      geom_bar() +
+      labs(x = "number of admissions per patient")
+```
+
+#### admission location
+
+Based on each admission record, the admission location is treated as a discrete variable. The most admission location is emergency room admit, which corresponds to the most admission type.
+
+```{r}
+    adm_loc1 <- admission %>%
+      group_by(ADMISSION_LOCATION) %>%
+      summarise(
+        count = n()
+      ) %>%
+      filter(count > 600)
+    adm_loc2 <- admission %>%
+      group_by(ADMISSION_LOCATION) %>%
+      summarise(count = n()) %>%
+      filter(count <= 600) %>%
+      mutate(tmp = sum(count))
+    adm_loc3 <- tribble(~ADMISSION_LOCATION, ~count,
+                        "OTHER", adm_loc2$tmp[1])
+    adm_loc <- bind_rows(adm_loc1, adm_loc3) %>% as.data.frame
+    label_value <- paste('(', round(adm_loc$count / sum(adm_loc$count) * 100,
+                                    1), '%)', sep = '')
+    label <- paste(adm_loc$ADMISSION_LOCATION, label_value, sep = '')
+    adm_loc %>%
+      ggplot(mapping = aes(x = 'portion', fill = ADMISSION_LOCATION)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+```
+
+#### insurance
+
+Based on each unique patient, we can get a sense of the insurance distribution. The insurance is treated as a discrete variable. Most of the patients use medicare and least of the patients pay by themselves.
+
+```{r}
+    people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
+    insurance <- people %>%
+      group_by(INSURANCE) %>%
+      summarise(
+        count = n()
+      ) %>% as.data.frame
+    label_value <- paste('(', round(insurance$count / sum(insurance$count)
+                                    * 100, 1), '%)', sep = '')
+    label <- paste(insurance$INSURANCE, label_value, sep = '')
+    people %>%
+      ggplot(mapping = aes(x = 'portion', fill = INSURANCE)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+```
+
+#### language
+
+Based on each unique patient, we can get a sense of the language distribution. The language is treated as a discrete variable. Most of the patients speak English.
+
+```{r}
+    people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
+    language1 <- people %>%
+      group_by(LANGUAGE) %>%
+      summarise(
+        count = n()
+      ) %>%
+      filter(count > 460)
+    language2 <- people %>%
+      group_by(LANGUAGE) %>%
+      summarise(count = n()) %>%
+      filter(count <= 460) %>%
+      mutate(tmp = sum(count))
+    language3 <- tribble(~LANGUAGE, ~count,
+                        "OTHER", language2$tmp[1])
+    language <- bind_rows(language1, language3) %>% as.data.frame
+    label_value <- paste('(', round(language$count / sum(language$count)
+                                    * 100, 1), '%)', sep = '')
+    label <- paste(language$LANGUAGE, label_value, sep = '')
+    language %>%
+      ggplot(mapping = aes(x = 'portion', fill = LANGUAGE)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+```
+
+#### religion
+
+Based on each unique patient, we can get a sense of the religion distribution. The religion is treated as a discrete variable. Most of the patients are catholic.
+
+```{r}
+    people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
+    religion1 <- people %>%
+      group_by(RELIGION) %>%
+      summarise(
+        count = n()
+      ) %>%
+      filter(count > 460, RELIGION != "OTHER")
+    religion2 <- people %>%
+      group_by(RELIGION) %>%
+      summarise(count = n()) %>%
+      filter(count <= 460 | RELIGION == "OTHER") %>%
+      mutate(tmp = sum(count))
+    religion3 <- tribble(~RELIGION, ~count,
+                        "OTHER", religion2$tmp[1])
+    religion <- bind_rows(religion1, religion3) %>% as.data.frame
+    label_value <- paste('(', round(religion$count / sum(religion$count)
+                                    * 100, 1), '%)', sep = '')
+    label <- paste(religion$RELIGION, label_value, sep = '')
+    religion %>%
+      ggplot(mapping = aes(x = 'portion', fill = RELIGION)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+```
+
+#### martial status
+
+Based on each unique patient, we can get a sense of the martial status distribution. The martial status is treated as a discrete variable. Most of the patients are married.
+
+```{r}
+    people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
+    martst <- people %>%
+      group_by(MARITAL_STATUS) %>%
+      summarise(
+        count = n()
+      ) %>% as.data.frame
+    label_value <- paste('(', round(martst$count / sum(martst$count)
+                                    * 100, 1), '%)', sep = '')
+    label <- paste(martst$MARITAL_STATUS, label_value, sep = '')
+    people %>%
+      ggplot(mapping = aes(x = 'portion', fill = MARITAL_STATUS)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+```
+
+#### ethnicity
+
+Based on each unique patient, we can get a sense of the ethnicity distribution. The ethnicity is treated as a discrete variable. Most of the patients are white.
+
+```{r}
+    people <- distinct(admission, SUBJECT_ID, .keep_all = TRUE)
+    enth1 <- people %>%
+      group_by(ETHNICITY) %>%
+      summarise(
+        count = n()
+      ) %>%
+      filter(count > 460)
+    enth2 <- people %>%
+      group_by(ETHNICITY) %>%
+      summarise(count = n()) %>%
+      filter(count <= 460) %>%
+      mutate(tmp = sum(count))
+    enth3 <- tribble(~ETHNICITY, ~count,
+                        "OTHER", enth2$tmp[1])
+    enth <- bind_rows(enth1, enth3) %>% as.data.frame
+    label_value <- paste('(', round(enth$count / sum(enth$count)
+                                    * 100, 1), '%)', sep = '')
+    label <- paste(enth$ETHNICITY, label_value, sep = '')
+    enth %>%
+      ggplot(mapping = aes(x = 'portion', fill = ETHNICITY)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+```
+
+#### death
+
+Since the death analysis for each admission makes more sense than the death analysis for each person from the perspective of each illness condition, the death analysis is based on each admission record. After plotting the death time with respect to the year, month, weekday and hour, we can conclude that the death happens randomly everyday but most of the death happens in the noon.
+
+```{r}
+    admission %>%
+      filter(!is.na(DEATHTIME)) %>%
+      ggplot(aes(x = DEATHTIME)) +
+      geom_freqpoly(binwidth = 31536000) +
+      labs(x = "Death year")
+```
+
+```{r}
+    admission %>%
+      filter(!is.na(DEATHTIME)) %>%
+      mutate(death_month = month(DEATHTIME, label = TRUE)) %>%
+      ggplot(aes(x = death_month)) +
+      geom_bar() +
+      labs(x = "Death month")
+```
+
+```{r}
+    admission %>%
+      filter(!is.na(DEATHTIME)) %>%
+      mutate(death_wday = wday(DEATHTIME, label = TRUE)) %>%
+      ggplot(aes(x = death_wday)) +
+      geom_bar() +
+      labs(x = "Death weekday")
+```
+
+```{r}
+    admission %>%
+      filter(!is.na(DEATHTIME)) %>%
+      mutate(death_hour = hour(DEATHTIME)) %>%
+      ggplot(aes(x = death_hour)) +
+      geom_bar() +
+      labs(x = "Death hour")
+```
+
+## Q2
+
+Link the data in `ADMISSION.csv` and `PATIENTS.csv` (<https://mimic.physionet.org/mimictables/patients/>) and summarize following variables using appropriate graphs:  
+
+- gender  
+- age at admission 
+
+**solution:**
+
+### Import data and link the data
+
+Let's turn flat files into tibbles and link the tibbles. `PATIENTS.csv` contains unique patient information. Then through left joint to admission information, every admission record is linked to one patient while the patient information shows up multiple times.
+
+```{r}
+    admission <- read_csv("/home/203bdata/mimic-iii/ADMISSIONS.csv",
+                         col_types = cols(ROW_ID = col_integer(),
+                                          SUBJECT_ID = col_integer(),
+                                          HADM_ID = col_integer(),
+                                          HOSPITAL_EXPIRE_FLAG = col_logical(),
+                                          HAS_CHARTEVENTS_DATA = col_logical()))
+    patient <- read_csv("/home/203bdata/mimic-iii/PATIENTS.csv")
+    adm_pinfo <- left_join(admission, patient, by = "SUBJECT_ID")
+    adm_pinfo %>% print(width = Inf)
+```
+
+### Graphs
+
+#### gender
+
+Based on each unique patient, we can get a sense of the gender distribution. The gender is treated as a discrete variable. The ratio of male patients to female patients is around 1 and the amount of male patients is larger than the amount of female patients.
+
+```{r}
+    adm_gender <- distinct(adm_pinfo, SUBJECT_ID, .keep_all = TRUE) %>%
+      group_by(GENDER) %>%
+      summarise(
+        count = n()
+      ) %>% as.data.frame
+    label_value <- paste('(', round(adm_gender$count / sum(adm_gender$count) *
+                                      100, 1), '%)', sep = '')
+    label <- paste(adm_gender$GENDER, label_value, sep = '')
+    adm_gender %>%
+      ggplot(mapping = aes(x = 'portion', fill = GENDER)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+```
+
+#### age at admission
+
+Based on each admission record, the age at admission is treated as a continuous variable. The newborns take the largest part and people around 75 years old also take a big part.
+
+```{r}
+    adm_pinfo %>%
+      mutate(AGE = as.numeric(as.duration(ADMITTIME - DOB) / 31536000)) %>%
+      ggplot(aes(x = AGE)) +
+      geom_freqpoly(bins = 100) +
+      labs(x = "Age at admission")
+```
+
+## Q3
+
+`ICUSTAYS.csv` (<https://mimic.physionet.org/mimictables/icustays/>) contains data about Intensive Care Units (ICU) stays. Summarize following variables using appropriate graphs:  
+
+- length of ICU stay  
+- first ICU unit  
+- gender  
+- age
+
+**solution:**
+
+### Import data and link the data
+
+Let's turn flat files into tibbles and link the tibbles. `PATIENTS.csv` contains unique patient information. Then through left joint to ICU stay information, every ICU stay record is linked to one patient while the patient information shows up multiple times.
+
+```{r}
+    patient <- read_csv("/home/203bdata/mimic-iii/PATIENTS.csv")
+    icustays <- read_csv("/home/203bdata/mimic-iii/ICUSTAYS.csv")
+    icustay <- left_join(icustays, patient, by = "SUBJECT_ID")
+    icustay %>% print(width = Inf)
+```
+
+### Graphs
+
+#### length of ICU stay
+
+Based on each ICU stay record, the length of ICU stay is treated as a discrete variable. Most of the patients stay in the ICU for less than 12 days at a time.
+
+```{r}
+    icustay %>%
+      mutate(los_days = as.numeric(as.duration(OUTTIME - INTIME) / 86400)) %>%
+      ggplot(aes(x = los_days)) +
+      geom_histogram(bins = 100) +
+      labs(x = "Length of ICU stay")
+```
+
+#### first ICU unit
+
+Based on each ICU stay record, the first ICU unit is treated as a discrete variable. Most of the patients are admitted to MICU at the beginning.
+
+```{r}
+    ICUunit <- icustay %>%
+      group_by(FIRST_CAREUNIT) %>%
+      summarise(
+        count = n()
+      ) %>% as.data.frame
+    label_value <- paste('(', round(ICUunit$count / sum(ICUunit$count) * 100,
+                                    1), '%)', sep = '')
+    label <- paste(ICUunit$FIRST_CAREUNIT, label_value, sep = '')
+    icustay %>%
+      ggplot(mapping = aes(x = 'portion', fill = FIRST_CAREUNIT)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+```
+
+#### gender
+
+Based on each unique patient, we can get a sense of the gender distribution. The gender is treated as a discrete variable. The ratio of male patients to female patients is around 1 and the amount of male patients is larger than the amount of female patients.
+
+```{r}
+    gender <- distinct(icustay, SUBJECT_ID, .keep_all = TRUE) %>%
+      group_by(GENDER) %>%
+      summarise(
+        count = n()
+      ) %>% as.data.frame
+    label_value <- paste('(', round(gender$count / sum(gender$count) * 100,
+                                    1), '%)', sep = '')
+    label <- paste(gender$GENDER, label_value, sep = '')
+    gender %>%
+      ggplot(mapping = aes(x = 'portion', fill = GENDER)) +
+      geom_bar(width = 1) +
+      coord_polar("y") +
+      labs(x = '', y = '', title = '') +
+      theme(axis.text = element_blank()) +
+      theme(axis.ticks = element_blank()) +
+      scale_fill_discrete(labels = label)
+```
+
+#### age
+
+Based on each unique patient, we can get a sense of the recent age distribution of the patients. The age is treated as a discrete variable. The newborns take the largest part and people around 75 years old also take a big part.
+
+```{r}
+    icustay %>%
+      mutate(age = as.numeric(as.duration(INTIME - DOB) / 31536000)) %>%
+      group_by(SUBJECT_ID) %>%
+      filter(rank(desc(age)) == 1) %>%
+      ggplot(aes(x = age)) +
+      geom_freqpoly(bins = 100) +
+      labs(x = "Age")
+```
+    
+## Q4 
+
+`CHARTEVENTS.csv` (<https://mimic.physionet.org/mimictables/chartevents/>) contains all the charted data available for a patient. During their ICU stay, the primary repository of a patient’s information is their electronic chart. The `ITEMID` variable indicates a single measurement type in the database. The `VALUE` variable is the value measured for `ITEMID`. 
+
+`D_ITEMS.csv` (<https://mimic.physionet.org/mimictables/d_items/>) is the dictionary for the `ITEMID` in `CHARTEVENTS.csv`. Find potential values of `ITEMID` that correspond to systolic blood pressure, i.e., `LABEL` contains the string `systolic`. 
+
+Compile a tibble that contains the first ICU stay of unique patients, with the patient's demographic information, the first systolic blood pressure measurement during ICU stay, and whether the patient died within 30 days of hospitcal admission.
+
+
+**solution:**
+
+### Prerequisites
+
+Load htmlwidgets:
+
+```{r}
+    library(htmlwidgets)
+```
+
+### Import data
+
+```{r}
+    admission <- read_csv("/home/203bdata/mimic-iii/ADMISSIONS.csv",
+                         col_types = cols(ROW_ID = col_integer(),
+                                          SUBJECT_ID = col_integer(),
+                                          HADM_ID = col_integer(),
+                                          HOSPITAL_EXPIRE_FLAG = col_logical(),
+                                          HAS_CHARTEVENTS_DATA = col_logical()))
+    patient <- read_csv("/home/203bdata/mimic-iii/PATIENTS.csv")
+    icustay <- read_csv("/home/203bdata/mimic-iii/ICUSTAYS.csv")
+    chart <- read_csv("/home/203bdata/mimic-iii/CHARTEVENTS.csv")
+    item <- read_csv("/home/203bdata/mimic-iii/D_ITEMS.csv")
+    admission %>% print(width = Inf)
+    patient %>% print(width = Inf)
+    icustay %>% print(width = Inf)
+    chart %>% print(width = Inf)
+    item %>% print(width = Inf)
+```
+
+### Compile the tibble
+
+- Select the first systolic blood pressure measurement information. First, find potential values of `ITEMID` that correspond to systolic blood pressure. Then, substract the systolic blood pressure measurement information from `CHARTEVENTS.csv` and choose the first systolic blood pressure measurement based on the `CHARTTIME` for each unique patient. Only keep the `SUBJECT_ID` and the corresponding first systolic blood pressure measurement information.
+
+```{r}
+    bloodp <- item %>%
+      filter(str_detect(LABEL, "systolic")) %>%
+      select(ITEMID, LABEL)
+    bloodp2 <- inner_join(chart, bloodp, by = "ITEMID") %>%
+      group_by(SUBJECT_ID) %>%
+      filter(rank(CHARTTIME) == 1) %>%
+      select(SUBJECT_ID, LABEL)
+    bloodp2 %>% print(width = Inf)
+```
+
+- Select the first ICU stay information of unique patients. Based on the `INTIME`, choose the first ICU stay of each unique patient from `ICUSTAYS.csv`. Only keep the `SUBJECT_ID` and the corresponding first ICU stay information.
+
+```{r}
+    first_icu <- icustay %>%
+      group_by(SUBJECT_ID) %>%
+      filter(rank(INTIME) == 1) %>%
+      select(SUBJECT_ID, FIRST_CAREUNIT)
+    first_icu %>% print(width = Inf)
+```
+
+- Select the patient's demographic and death information. First, through left joint patient information to admission information, every admission record is linked to one patient while the patient information shows up multiple times. Then, based on the information, whether the patient died within 30 days of hospital admission can be determined. Substract information for each unique patient. For each unique patient, once one admission record shows that the patient died within 30 days, this death information is kept. Only keep the `SUBJECT_ID` and the corresponding demographic and death information.
+
+```{r}
+    pinfo <- left_join(admission, patient, by = "SUBJECT_ID") %>%
+      mutate(dead30 = ((as.numeric(as.duration(DEATHTIME - ADMITTIME) / 86400)
+                                  ) <= 30)) %>%
+      group_by(SUBJECT_ID) %>%
+      filter(rank(desc(dead30)) == 1) %>%
+      select(SUBJECT_ID, LANGUAGE: ETHNICITY, GENDER, DOB, dead30)
+    pinfo %>% print(width = Inf)
+```
+
+- Compile the tibble. Full join all the information kept above by `SUBJECT_ID`. Then we get a tibble that contains the first ICU stay of unique patients, with the patient’s demographic information, the first systolic blood pressure measurement during ICU stay, and whether the patient died within 30 days of hospitcal admission.
+
+```{r}
+    info <- pinfo %>%
+      full_join(bloodp2, by = "SUBJECT_ID") %>%
+      full_join(first_icu, by = "SUBJECT_ID")
+    info %>% print(width = Inf)
+```
+
+
