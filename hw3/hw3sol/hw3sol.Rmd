@@ -32,38 +32,13 @@ Below is some data exploration, which may help you get started. You do _not_ hav
 
 <!-- Time series table: <https://docs.google.com/spreadsheets/d/1UF2pSkFTURko2OvfHWWlFpDFAr1UxCBA4JLwlSP6KFo/edit#gid=0> -->
 
+## Prerequisite
 ```{r include=FALSE}
 library(tidyverse)
 library(lubridate)
-library(fs)
-```
-
-## Import JHU Google Sheets into R - **EXPIRED on Feb 11**
-
-**Since Feb 11, JHU CSSE stops posting data on Google Sheets.**
-
-Johns Hopkins University (JHU) Center for Systems Science and Engineering (CSSE) kindly compiles, updates, and shares the current data on 2019-nCoV outbreak at Google Sheets: <https://docs.google.com/spreadsheets/d/1UF2pSkFTURko2OvfHWWlFpDFAr1UxCBA4JLwlSP6KFo>.
-
-We can use the tidyverse package [`googlesheets4`](https://googlesheets4.tidyverse.org) to import data from Google Sheets. Because the JHU sheets are public, we don't need authentication by tokens.
-```{r, eval = FALSE}
-library(googlesheets4)
-# no authentication
-sheets_deauth()
-```
-Import the `confirmed` sheet:
-```{r, eval = FALSE}
-(confirmed <- 
-   read_sheet("1UF2pSkFTURko2OvfHWWlFpDFAr1UxCBA4JLwlSP6KFo", sheet = 2))
-```
-Import the `recovered` sheet:
-```{r, eval = FALSE}
-(recovered <- 
-   read_sheet("1UF2pSkFTURko2OvfHWWlFpDFAr1UxCBA4JLwlSP6KFo", sheet = 3))
-```
-Import the `death` sheet:
-```{r, eval = FALSE}
-(death <- 
-   read_sheet("1UF2pSkFTURko2OvfHWWlFpDFAr1UxCBA4JLwlSP6KFo", sheet = 4))
+library(sf)
+library(shiny)
+fluidPage()
 ```
 
 ## Import JHU SSE data on GitHub into R
@@ -113,53 +88,11 @@ ncov_tbl <- confirmed_long %>%
                names_to = "Case", 
                values_to = "Count")
 ncov_tbl %>% print(width = Inf)
+# prepare data for shiny app
+saveRDS(ncov_tbl, file = "2019-20Coronavirus/ncov_tbl.rds")
 ```
-
-## Other data sources
-
-Other sources of data:  
-- Tencent (in Chinese): <https://news.qq.com/zt2020/page/feiyan.htm>  
-- R package `nCov2019`; install by `remotes::install_github("GuangchuangYu/nCov2019")`   
-- Shiny app [`coronavirus`](https://github.com/JohnCoene/coronavirus)   
 
 ## Mapping China provinces
-
-Some useful resources for mapping:  
-- The book [_Geocomputation with R_](https://geocompr.robinlovelace.net). Especially [Chapter 8 Making Maps with R](https://geocompr.robinlovelace.net/adv-map.html).  
-- The book [_An Introduction to Spatial Analysis and Mapping in R_](https://bookdown.org/lexcomber/brunsdoncomber2e/). 
-
-### Use mapdata - **MAP IS TOO OLD**
-
-The package `mapdata` contains a data `china`. But the map seems out-dated. For example, Chongqing is sill a part of Sichuan province in this map.
-```{r}
-suppressMessages(library(mapdata))
-map("china", col = "gray40", ylim = c(18,54))
-```
-
-### Use GADM data - **THIS IS VERY SLOW**
-
-Download GADM data for China at <https://www.gadm.org/download_country_v3.html>. There are 4 levels of details to plot. We opt for the level 1 which is at the province level.
-```{r, eval = FALSE}
-library(sf)
-library(tidyverse)
-gadm36_CHN_1_sf <- readRDS("gadm36_CHN_0_sf.rds")
-ggplot(data = gadm36_CHN_1_sf) + 
-  geom_sf()
-```
-
-```{r, eval = FALSE}
-library("GADMTools")
-map <- gadm_sp_loadCountries("CHN", level = 1, basefile = "./")
-gadm_plot(map) + theme_light()
-```
-
-### Use shapefile from GADM - **THIS IS VERY SLOW**
-
-```{r, eval = FALSE}
-library(maptools)
-map <- rgdal::readOGR("gadm36_CHN_shp/gadm36_CHN_1.shp")
-plot(map)
-```
 
 ### Use GIS data from China
 
@@ -289,6 +222,8 @@ chn_prov <- chn_map %>%
   count(NAME) %>%
   mutate(NAME_ENG = translate(NAME)) # translate function is vectorized
 chn_prov %>% print(n = Inf)
+# prepare data for shiny app
+saveRDS(chn_prov, file = "2019-20Coronavirus/chn_prov.rds")
 ```
 
 ## Plotting 2019-nCoV incidence
