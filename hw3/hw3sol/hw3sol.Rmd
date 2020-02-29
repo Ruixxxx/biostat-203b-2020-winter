@@ -462,6 +462,7 @@ China <- info %>%
 colnames(China)[7] <- "Count"
 China
 
+# note here we delete the information from unspecified countries
 Other <- info %>% 
   filter(`Country/Region` != "Mainland China", `Country/Region` != "Macau", 
          `Country/Region` != "Hong Kong", `Country/Region` != "Taiwan",
