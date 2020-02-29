@@ -5,8 +5,8 @@ account: ruixxxx
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1881899
-bundleId: 2839321
+bundleId: 2839365
 url: https://ruixxxx.shinyapps.io/2019-20Coronavirus/
-when: 1582963179.43168
+when: 1582966302.46629
 asMultiple: FALSE
 asStatic: FALSE
