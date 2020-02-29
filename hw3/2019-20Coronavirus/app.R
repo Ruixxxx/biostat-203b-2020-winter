@@ -3,9 +3,12 @@ library(shiny)
 library(shinythemes)
 library(ggplot2)
 library(tidyverse)
+library(lubridate)
 library(wesanderson)
-library(gapminder)
+library(sf)
 library(gganimate)
+library(transformr)
+library(maps)
 library(quantmod)
 
 # Load data ----
@@ -202,7 +205,7 @@ server <- function(input, output) {
     output$gif <- renderImage({
         # p <- str_c("../hw3sol/", input$animation, "_anim.gif") %>% 
         #     as.character() %>% as.vector()
-        list(src = paste0("../hw3sol/", input$animation, "_anim.gif"))
+        list(src = paste0(input$animation, "_anim.gif"))
         # gif_file(p) %>%
         #     print()
     }, deleteFile = FALSE)
