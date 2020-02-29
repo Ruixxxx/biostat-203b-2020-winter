@@ -397,7 +397,7 @@ for (case in c("confirmed", "recovered", "death")) {
   transition_time(Date) + 
   labs(title = str_c(case, " cases"), subtitle = "Date: {frame_time}"))
   animate(anim, renderer = gifski_renderer())
-  anim_save(str_c(case, "_anim.gif"))
+  anim_save(str_c("../2019-20Coronavirus/", case, "_anim.gif"))
 } 
 ```
 
@@ -431,7 +431,7 @@ p <- ncov_tbl %>%
   transition_time(Date) + 
   labs(title = str_c("data animation"), subtitle = "Date: {frame_time}"))
   animate(anim, renderer = gifski_renderer())
-  anim_save(str_c("data_anim.gif"))
+  anim_save(str_c("../2019-20Coronavirus/data_anim.gif"))
 ```
 <p align="center">
   <img src="./data_anim.gif">
