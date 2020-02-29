@@ -181,8 +181,7 @@ server <- function(input, output) {
             transition_time(Date) + 
             labs(title = str_c(input$case3, " cases"), 
                  subtitle = "Date: {frame_time}")
-        animate(anim, renderer = gifski_renderer())
-        anim_save("anim.gif")
+        anim_save("anim.gif", animate(anim, renderer = gifski_renderer()))
         
     })
 

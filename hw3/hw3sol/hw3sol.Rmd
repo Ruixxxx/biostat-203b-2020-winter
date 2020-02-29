@@ -38,6 +38,8 @@ library(tidyverse)
 library(lubridate)
 library(wesanderson)
 library(sf)
+library(gganimate)
+library(transformr)
 library(maps)
 library(shiny)
 fluidPage()
@@ -48,6 +50,7 @@ fluidPage()
 Since Feb 11, JHU SSE is hosting 2019 nCoV data on GitHub repo: <https://github.com/CSSEGISandData/2019-nCoV>.
 
 Let's import the time series data directly from the csv file on GitHub:
+
 ```{r}
 (confirmed <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv"))
 (recovered <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv"))
@@ -57,6 +60,7 @@ Let's import the time series data directly from the csv file on GitHub:
 ## Tidy data
 
 I want to tidy data into the long format. `pivot_longer` is the modern version of `gather` function in dplyr.
+
 ```{r}
 confirmed_long <- confirmed %>%
   pivot_longer(-(`Province/State`:Long), 
@@ -65,6 +69,7 @@ confirmed_long <- confirmed %>%
   mutate(Date = (mdy(Date))) # convert string to date-time
 confirmed_long
 ```
+
 ```{r}
 recovered_long <- recovered %>%
   pivot_longer(-(`Province/State`:Long), 
@@ -73,6 +78,7 @@ recovered_long <- recovered %>%
   mutate(Date = mdy(Date))
 recovered_long
 ```
+
 ```{r}
 death_long <- death %>%
   pivot_longer(-(`Province/State`:Long), 
@@ -90,21 +96,26 @@ ncov_tbl <- confirmed_long %>%
                names_to = "Case", 
                values_to = "Count")
 ncov_tbl %>% print(width = Inf)
-# prepare data for shiny app
+# prepare coronavirus data for shiny app
 saveRDS(ncov_tbl, file = "../2019-20Coronavirus/ncov_tbl.rds")
 ```
 
-## Mapping China provinces
+## Mapping preparation
 
-### Use GIS data from China
+### Mapping China provinces
+
+#### Use GIS data from China
 
 A self note about installing `sf` package on CentOS 7: <https://gist.github.com/Hua-Zhou/6c11babe35437ce1ea8e4893a14d07c8>.
 
 Donwload China GIS data from [here](https://uploads.cosx.org/2009/07/chinaprovinceborderdata_tar_gz.zip), unzip, and put in the working directory.
+
 ```{bash}
 ls -l bou2_4p.*
 ```
+
 Read in the shape file into simple feature (SF) format. Replace the `NA` in `NAME` by Macau.
+
 ```{r}
 library(sf)
 chn_map <- st_read("./bou2_4p.shp", as_tibble = TRUE) %>%
@@ -114,15 +125,17 @@ chn_map <- st_read("./bou2_4p.shp", as_tibble = TRUE) %>%
   mutate(NAME = str_replace_na(NAME, replacement = "澳门特别行政区")) %>%
   print()
 ```
-There are about 34 provinces in China, why there are 925 areas?
+
+There are about 34 provinces in China, why there are 925 areas? Because one province is composed of n (n >= 1) polygons. 
+
 ```{r}
 chn_map %>% 
   count(NAME) %>% 
   print(n = Inf)
 ```
 
-
 `ggplot2` can plot SF data using `geom_sf` function:
+
 ```{r}
 chn_map %>%
   ggplot() + 
@@ -130,14 +143,19 @@ chn_map %>%
   #geom_sf_label(mapping = aes(label = NAME)) + 
   theme_bw() # better for maps 
 ```
+
 These are the provinces available from the JHU sheets.
+
 ```{r}
 ncov_tbl %>%
-  filter(`Country/Region` %in% c("Mainland China", "Macau", "Hong Kong", "Taiwan")) %>%
+  filter(`Country/Region` %in% c("Mainland China", "Macau", 
+                                 "Hong Kong", "Taiwan")) %>%
   distinct(`Province/State`, `Country/Region`) %>%
   print(n = Inf)
 ```
+
 In order to join the tibbles `ncov_tbl` and `chn_map`, we need to use the province name as key. Let's create a function to translate Chinese province name to English.
+
 ```{r}
 translate <- function(x) {
   sapply(x, function(chn_name) {
@@ -218,148 +236,32 @@ translate <- function(x) {
   })
 }
 ```
+
 Create a new variable `NAME_ENG`:
+
 ```{r}
 chn_prov <- chn_map %>% 
   count(NAME) %>%
   mutate(NAME_ENG = translate(NAME)) # translate function is vectorized
 chn_prov %>% print(n = Inf)
-# prepare data for shiny app
+# prepare China map data for shiny app
 saveRDS(chn_prov, file = "../2019-20Coronavirus/chn_prov.rds")
 ```
 
-## Plotting 2019-nCoV incidence
+### Mapping countries
 
-Try to join the virus data `ncov_tbl` and map data `chn_prov`.
-```{r}
-# for exploration
-plotdate <- "2020-02-14"
-case <- "confirmed"
-ncov_tbl %>%
-  filter(`Country/Region` %in% c("Mainland China", "Macau", "Hong Kong", "Taiwan")) %>%
-  filter(Date == plotdate, Case == case) %>%
-  group_by(`Province/State`) %>%  
-  top_n(1, Date) %>%
-  right_join(chn_prov, by = c("Province/State" = "NAME_ENG")) # join map and virus data
-```
-
-Plot confirmed cases on a specific date:
-```{r}
-plotdate <- "2020-02-14"
-case <- "confirmed"
-
-ncov_tbl %>%
-  filter(`Country/Region` %in% c("Mainland China", "Macau", "Hong Kong", "Taiwan")) %>%
-  filter(Date == plotdate, Case == case) %>%
-  group_by(`Province/State`) %>%  
-  top_n(1, Date) %>% # take the latest count on that date
-  right_join(chn_prov, by = c("Province/State" = "NAME_ENG")) %>%
-  ggplot() +
-  geom_sf(mapping = aes(fill = Count, geometry = geometry)) +
-  # scale_fill_gradient(low = "white",
-  #                     high = "red",
-  #                     trans = "log10",
-  #                     limits = c(1, 50000),
-  #                     breaks = c(1, 10, 100, 1000, 10000),
-  #                     name = "") +
-  scale_fill_gradientn(colors = wes_palette("Zissou1", 100, type = "continuous"),
-                       trans = "log10") + # can we find a better palette?
-  # #scale_fill_brewer(palette = "Dark2") + 
-  theme_bw() +
-  labs(title = str_c(case, " cases"), subtitle = plotdate)
-```
-
-To plot the line graph of confirmed cases over time:
-```{r}
-ncov_tbl %>%
-  filter(`Country/Region` %in% c("Mainland China", "Macau", "Hong Kong", "Taiwan")) %>%
-  group_by(Date, Case) %>%  
-  summarise(total_count = sum(Count)) %>%
-  # print()
-  ggplot() +
-  geom_line(mapping = aes(x = Date, y = total_count, color = Case)) +
-  scale_color_manual(values = c("blue", "black", "green")) + 
-  scale_y_log10() +
-  labs(y = "Count") + 
-  theme_bw()
-```
-
-## Animation
-
-Resources about making animations in R:  
-- [gganimate](https://gganimate.com/index.html) package.  
-- Section 8.3 of [Geomcomputation with R](https://geocompr.robinlovelace.net/adv-map.html#animated-maps). 
-
-```{r}
-ncov_tbl %>%
-  filter(`Country/Region` %in% c("Mainland China", "Macau", "Hong Kong", "Taiwan")) %>%
-  filter(Case == case) %>%
-  right_join(chn_prov, by = c("Province/State" = "NAME_ENG")) %>%
-  print()
-```
-
-Plot the date at all time points (this takes long, a couple minutes):
-```{r}
-library(gganimate)
-library(transformr)
-
-case = "confirmed"
-
-(p <- ncov_tbl %>%  
-  filter(`Country/Region` %in% c("Mainland China", "Macau", "Hong Kong", "Taiwan")) %>%
-  filter(Case == case) %>%
-  right_join(chn_prov, by = c("Province/State" = "NAME_ENG")) %>%
-  ggplot() + 
-  geom_sf(mapping = aes(fill = Count, geometry = geometry)) + 
-  # scale_fill_gradient(low = "white",
-  #                     high = "red",
-  #                     trans = "log10",
-  #                     limits = c(1, 100000),
-  #                     breaks = c(1, 10, 100, 1000, 10000),
-  #                     name = "") +
-  scale_fill_gradientn(colours = wes_palette("Zissou1", 100, type = "continuous"),
-                       trans = "log10") + 
-  theme_bw() +
-  labs(title = str_c(case, " cases")))
-```
-Make animation and save as gif (this takes long, a couple minutes)
-```{r}
-(anim <- p + 
-  transition_time(Date) + 
-  labs(title = "Confirmed Cases", subtitle = "Date: {frame_time}"))
-animate(anim, renderer = gifski_renderer())
-anim_save("confirmed_anim.gif")
-```
-<p align="center">
-  <img src="./confirmed_anim.gif">
-</p>
-
-## Impact on economy
-
-```{r}
-library(quantmod)
-stock <- getSymbols("^HSI", # S&P 500 (^GSPC), Dow Jones (^DJI), NASDAQ (^IXIC), Russell 2000 (^RUT), FTSE 100 (^FTSE), Nikkei 225 (^N225), HANG SENG INDEX (^HSI)
-                    src = "yahoo", 
-                    auto.assign = FALSE, 
-                    from = min(ncov_tbl$Date),
-                    to = max(ncov_tbl$Date)) %>% 
-  as_tibble(rownames = "Date") %>%
-  mutate(Date = date(Date)) %>%
-  ggplot() + 
-  geom_line(mapping = aes(x = Date, y = HSI.Adjusted)) +
-  theme_bw()
-stock
-# chartSeries(stock, theme = chartTheme("white"),
-#            type = "line", log.scale = FALSE, TA = NULL)
-```
-
-
-## Mapping countries
+The package `maps` contains a data `world` for the world map. `ggplot2` can plot the world map data using `geom_polygon` function.
 
 ```{r}
 countries <- map_data("world") %>% as_tibble()
-head(countries, 20)
+ggplot(countries, aes(long, lat, group = group)) + 
+  geom_polygon(fill = "white", colour = "black") + 
+  coord_quickmap()
+```
 
+In order to join the tibbles `ncov_tbl` and `countries`, we need to make the names of countries in these two tibbles consistent. Let's create a function to realize this requirement. 
+
+```{r}
 translate2 <- function(x) {
   sapply(x, function(name) {
     if (str_detect(name, "China")) {
@@ -379,9 +281,165 @@ countries <- countries %>%
   mutate(new_name = translate2(`region`))
 countries
 
-# prepare data for shiny app
+# prepare the world map data for shiny app
 saveRDS(countries, file = "../2019-20Coronavirus/countries.rds")
 ```
+
+## Plotting 2019-nCoV incidence
+
+### Plot 2019-nCoV incidents in China
+
+#### Plot one case type on a specific date vs province
+
+Try to join the virus data `ncov_tbl` and map data `chn_prov`.
+
+```{r}
+# for exploration
+plotdate <- "2020-02-14"
+case <- "confirmed"
+plotaday <- ncov_tbl %>%
+  filter(`Country/Region` %in% c("Mainland China", "Macau", 
+                                 "Hong Kong", "Taiwan")) %>%
+  filter(Date == plotdate, Case == case) %>%
+  group_by(`Province/State`) %>%  
+  top_n(1, Date) %>%
+  right_join(chn_prov, by = c("Province/State" = "NAME_ENG"))
+```
+
+Plot confirmed cases on a specific date:
+
+```{r}
+plotaday %>%
+  ggplot() +
+  geom_sf(mapping = aes(fill = Count, geometry = geometry)) +
+  # scale_fill_gradient(low = "white",
+  #                     high = "red",
+  #                     trans = "log10",
+  #                     limits = c(1, 50000),
+  #                     breaks = c(1, 10, 100, 1000, 10000),
+  #                     name = "") +
+  scale_fill_gradientn(colors = wes_palette("Zissou1", 100, 
+                       type = "continuous"), trans = "log10") +
+  # #scale_fill_brewer(palette = "Dark2") + 
+  theme_bw() +
+  labs(title = str_c(case, " cases"), subtitle = plotdate)
+```
+
+#### Plot three case types on a specific date vs province
+
+Counts by province on a specific date.
+
+```{r}
+date <- "2020-02-18"
+ncov_tbl %>%
+  filter(`Country/Region` %in% c("Mainland China", "Macau", 
+                                 "Hong Kong", "Taiwan"), 
+         `Date` == date) %>%
+  group_by(`Province/State`) %>%
+  ggplot() +
+  geom_col(mapping = aes(x = `Province/State`, y = `Count`, fill = `Case`)) + 
+  scale_y_log10() +
+  labs(title = date) + 
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+#### Plot the line graph of one/all case type(s) over time 
+
+To plot the line graph of confirmed cases over time:
+
+```{r}
+ncov_tbl %>%
+  filter(`Country/Region` %in% c("Mainland China", "Macau", 
+                                 "Hong Kong", "Taiwan")) %>%
+  group_by(Date, Case) %>%  
+  summarise(total_count = sum(Count)) %>%
+  # print()
+  ggplot() +
+  geom_line(mapping = aes(x = Date, y = total_count, color = Case), size = 2) +
+  scale_color_manual(values = c("blue", "black", "green")) + 
+  scale_y_log10() +
+  labs(y = "Count") + 
+  theme_bw()
+```
+
+#### Animation
+
+Resources about making animations in R:  
+- [gganimate](https://gganimate.com/index.html) package.  
+- Section 8.3 of [Geomcomputation with R](https://geocompr.robinlovelace.net/adv-map.html#animated-maps). 
+
+- Plot the map animation
+
+Plot the date at all time points (this takes long, a couple minutes), make animation and save as gif (this takes long, a couple minutes):
+
+```{r}
+for (case in c("confirmed", "recovered", "death")) {
+  (p <- ncov_tbl %>%  
+  filter(`Country/Region` %in% c("Mainland China", "Macau", 
+                                 "Hong Kong", "Taiwan")) %>%
+  filter(Case == case) %>%
+  right_join(chn_prov, by = c("Province/State" = "NAME_ENG")) %>%
+  ggplot() + 
+  geom_sf(mapping = aes(fill = Count, geometry = geometry)) + 
+  # scale_fill_gradient(low = "white",
+  #                     high = "red",
+  #                     trans = "log10",
+  #                     limits = c(1, 100000),
+  #                     breaks = c(1, 10, 100, 1000, 10000),
+  #                     name = "") +
+  scale_fill_gradientn(colours = wes_palette("Zissou1", 100, 
+                       type = "continuous"), trans = "log10") + 
+  theme_bw() +
+  labs(title = str_c(case, " cases")))
+  
+  # make animation and save as gif
+  (anim <- p + 
+  transition_time(Date) + 
+  labs(title = str_c(case, " cases"), subtitle = "Date: {frame_time}"))
+  animate(anim, renderer = gifski_renderer())
+  anim_save(str_c(case, "_anim.gif"))
+} 
+```
+
+<p align="center">
+  <img src="./confirmed_anim.gif">
+</p>
+
+<p align="center">
+  <img src="./recovered_anim.gif">
+</p>
+
+<p align="center">
+  <img src="./death_anim.gif">
+</p>
+
+- Plot the data animation
+
+```{r}
+p <- ncov_tbl %>%
+  filter(`Country/Region` %in% c("Mainland China", "Macau", 
+                                 "Hong Kong", "Taiwan")) %>%
+  group_by(`Province/State`) %>%
+  ggplot() +
+  geom_col(mapping = aes(x = `Province/State`, y = `Count`, fill = `Case`)) + 
+  scale_y_log10() +
+  labs(title = date) + 
+  theme(axis.text.x = element_text(angle = 90))
+
+  # make animation and save as gif
+  (anim <- p + 
+  transition_time(Date) + 
+  labs(title = str_c("data animation"), subtitle = "Date: {frame_time}"))
+  animate(anim, renderer = gifski_renderer())
+  anim_save(str_c("data_anim.gif"))
+```
+<p align="center">
+  <img src="./data_anim.gif">
+</p>
+
+### Plot 2019-nCoV incidents in the world
+
+#### Plot one case type on a specific date vs country
 
 ```{r}
 plotdate <- "2020-02-14"
@@ -444,6 +502,8 @@ ggplot(map, aes(long, lat, group = group, color = Count)) +
   coord_quickmap()
 ```
 
+#### Plot the line graph of one/all case type(s) over time
+
 To plot the line graph of confirmed cases over time.
 
 ```{r}
@@ -459,7 +519,24 @@ ncov_tbl %>%
   theme_bw()
 ```
 
+### Impact on economy
 
+```{r}
+library(quantmod)
+stock <- getSymbols("^HSI", # S&P 500 (^GSPC), Dow Jones (^DJI), NASDAQ (^IXIC), Russell 2000 (^RUT), FTSE 100 (^FTSE), Nikkei 225 (^N225), HANG SENG INDEX (^HSI)
+                    src = "yahoo", 
+                    auto.assign = FALSE, 
+                    from = min(ncov_tbl$Date),
+                    to = max(ncov_tbl$Date)) %>% 
+  as_tibble(rownames = "Date") %>%
+  mutate(Date = date(Date)) %>%
+  ggplot() + 
+  geom_line(mapping = aes(x = Date, y = HSI.Adjusted)) +
+  theme_bw()
+stock
+# chartSeries(stock, theme = chartTheme("white"),
+#            type = "line", log.scale = FALSE, TA = NULL)
+```
 
 
 
