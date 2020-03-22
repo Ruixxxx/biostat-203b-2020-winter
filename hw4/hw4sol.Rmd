@@ -1,6 +1,6 @@
 ---
 title: "Biostat 203B Homework 4"
-subtitle: Due Mar 20 @ 11:59PM
+subtitle: Due Mar 22 @ 11:59PM
 author: Rui Xu
 output:
   # ioslides_presentation: default
@@ -41,7 +41,8 @@ In this assignment, you are to write a report analyzing the electronic health re
 
 # Introduction
 
-
+The MIMIC-III (*M*edical *I*nformation *M*art for *I*ntensive *C*are III) is a database comprising deidentified health-related data associated with over forty thousand patients who stayed in critical care units of the Beth Israel Deaconess Medical Center between 2001 and 2012. The database includes information such as admission information, patients' demographics, diagnose information, and ICU stay information.
+I plan to use the information to construct a study cohort, where patients are dignosed complications of pregancy, childbirth, and the puerperium, and admitted into ICU. The study cohort covers the age, ethnicity of patients, the severity of ailments, ICD-9 code, principal or not diagnose information, and the length of stay in ICU. Two models are built so that whether a pregant patient stay in ICU for more than 5 days can be predicted with the first 5 variable information.
 
 # Data preparation
 
@@ -281,14 +282,8 @@ Finally, we convert the length of patient's stay in ICU into whether the patient
 ```{r}
 icu_diagnose %>%
   mutate(los = (los >= 5)) %>% 
-  print() -> icu_diagnose
-```
-
-## Close the connection to a database
-
-Close the connection:
-```{r}
-dbDisconnect(con)
+  print(width = Inf) -> icu_diagnose
+icu_diagnose %>% as.tibble()
 ```
 
 ## CONSORT Flow Diagrams
@@ -348,25 +343,127 @@ for (i in 1:num_of_boxes) {
   }
 ```
 
-## Install PostgreSQL and `RpostgreSQL` package on CentOS
-
-This is a note to myself (Dr. Hua Zhou). The postgres in yum is an old version. We want to install the most recent postgres and then build the `RpostgreSQL` package based on it. 
-
-1. Follow instructions in <https://www.digitalocean.com/community/tutorials/how-to-install-and-use-postgresql-on-centos-7> to install PostgreSQL 11 on CentOS 7. 
-
-2. Issue following command to install `RPostgreSQL` in R:
-```{bash, eval = F}
-sudo R -e 'Sys.setenv(PG_INCDIR="/usr/pgsql-11/include/"); Sys.setenv(PG_LIBDIR="/usr/pgsql-11/lib/"); install.packages("RPostgreSQL")'
-```
 
 # Data visualization
 
 Now we have a study cohort consisting of pregant patient information. Some patients stay in ICU for more than 5 days and the others do not. Plot each column of the patient information with respect to whether the patient stay in ICU for more than 5 days to get the sense of inherent relationships between them.
 
+Based on each cohort record, the age at admission is treated as a discrete variable. There are similar amounts of patients at full age that stay in ICU for more than 5 days.
 
+```{r}
+icu_diagnose %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = age, fill = los))
+```
+
+Based on each cohort record, the severity of patients' ailments is treated as a discrete variable. Patients with severer ailments tend to stay more than 5 days in ICU.
+
+```{r}
+icu_diagnose %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = drg_severity, fill = los))
+```
+
+Based on each cohort record, the ICD-9 code related to complications of pregancy, childbirth, and the puerperium is treated as a discrete variable. Patients with different ICD-9 code have significant difference in whether the length of stay in ICU is more than 5 days or not.
+
+```{r}
+icu_diagnose %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = icd9_code, fill = los)) + 
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+Based on each cohort record, whether principal diagonosis or not is treated as a discrete variable. Patients diagonosed pregancy principally tend to stay more than 5 days in ICU.
+
+```{r}
+icu_diagnose %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = principal_dx, fill = los))
+```
+
+Based on each cohort record, the ethnicity of patients is treated as a discrete variable. Patients with hispanic ethnicity tend to stay less than 5 days in ICU.
+
+```{r}
+icu_diagnose %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = ethnic_group, fill = los)) + 
+  theme(axis.text.x = element_text(angle = 90))
+```
 
 # Analytics
 
+Let's further manipulate the study cohort such that all the variables are type of numerial values between 0 and 1.
+
+```{r}
+icu_diagnose %>% 
+  mutate(los = ifelse(los, 1, 0)) %>% 
+  mutate(principal_dx = ifelse(principal_dx, 1, 0)) %>% 
+  mutate(ethnic_group = case_when(
+    str_detect(ethnic_group, "ASIAN") ~ 1, 
+    str_detect(ethnic_group, "BLACK") ~ 2, 
+    str_detect(ethnic_group, "HISPANIC") ~ 3, 
+    str_detect(ethnic_group, "WHITE") ~ 4, 
+    str_detect(ethnic_group, "UNKNOWN") ~ 5
+  )) %>% 
+  select(age, drg_severity, icd9_code, principal_dx, ethnic_group, los) %>% 
+  mutate(age = age / 45.0) %>%
+  mutate(drg_severity = drg_severity / 4) %>%
+  mutate(icd9_code = as.numeric(icd9_code) / 68000) %>%
+  mutate(ethnic_group = ethnic_group / 5) %>%
+  print() -> raw_data
+
+raw_data <- as.data.frame(raw_data) %>% 
+  unname() %>% 
+  # as.matrix() %>% 
+  print()
+
+x_train <- raw_data[1:130, 1:5] %>% print()
+y_train <- raw_data[1:130, 6] %>% print()
+dim(x_train)
+dim(y_train)
+
+x_test <- raw_data[131:154, 1:5] %>% print()
+y_test <- raw_data[131:154, 6] %>% print()
+dim(x_test)
+dim(y_test)
+# raw_data <- as.vector(raw_data) %>% print()
+```
+
+## MNIST-MLP model
+
+Define a sequential model (a linear stack of layers) with 2 fully-connected hidden layers (50 and 25 neurons).
+
+```{r}
+library(keras)
+library(tensorflow)
+```
+```{r}
+model1 <- keras_model_sequential()
+model1 %>% 
+  layer_dense(units = 10, activation = 'relu', input_shape = c(5)) %>% 
+  layer_dropout(rate= 0.4) %>% 
+  # layer_dense(units = 5, activation = 'relu') %>% 
+  # layer_dropout(rate = 0.3) %>% 
+  layer_dense(units = 5, activation = 'softmax')
+summary(model1)
+```
+
+Compile the model with appropriate loss function, optimizer, and metrics.
+
+```{r}
+model1 %>% compile(
+  loss = 'categorical_crossentropy', 
+  optimizer = optimizer_rmsprop(), 
+  metrics = c('accuracy')
+)
+```
+
+## Close the connection to a database
+
+Close the connection:
+```{r}
+dbDisconnect(con)
+```
 
 # Conclusions
 
