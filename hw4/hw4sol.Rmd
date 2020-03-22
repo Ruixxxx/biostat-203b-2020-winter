@@ -37,7 +37,7 @@ In this assignment, you are to write a report analyzing the electronic health re
 
 - The GitHub repository <https://github.com/MIT-LCP/mimic-code> contains some code examples for working with the MIMIC-III data. Following sample code derives from <https://github.com/MIT-LCP/mimic-code/blob/master/tutorials/dplyr-frontend/intro.md>. 
 
-# Title: _More-than-10-Day ICU Stay Rate of Pregnant Woman_
+# Title: _More-than-5-Day ICU Stay Rate of Pregnant Woman_
 
 # Introduction
 
@@ -85,11 +85,14 @@ dbListTables(con)
 
 In this section, we demo how to create a cohort of patients who were admitted into ICU and were diagnosed with pregnancy.
 
-First we create a (query) table of patients who were admitted into ICU with length of ICU stay more than 5 days.
+First we create a (query) table of patients who were admitted into ICU.
 ```{r}
 tbl(con, "icustays") %>%
-  select(subject_id, hadm_id, icustay_id, los) %>%
-  filter(los >= 5) %>% 
+  select(subject_id, hadm_id, los) %>%
+  filter(!is.na(los)) %>% 
+  # group_by(subject_id) %>% 
+  # mutate(los = sum(los)) %>% 
+  # filter(los >= 5) %>% 
   print() -> icustays
 ```
 
@@ -136,7 +139,12 @@ diagnose %>%
 Now we `inner_join` the table of admissions to ICU and the table of admissions that include MI diagnosis.
 ```{r}
 icustays %>%
-  inner_join(diagnose, by = c("subject_id", "hadm_id")) %>%
+  inner_join(diagnose, by = c("subject_id", "hadm_id")) %>% 
+  group_by(subject_id, hadm_id) %>%
+  mutate(los = sum(los)) %>% 
+  summarize_all(min, na.rm = TRUE) %>% 
+  # distinct(subject_id, hadm_id, .keep_all = TRUE) %>%
+  # ungroup() %>%
   print() -> icu_diagnose
 ```
 
@@ -268,6 +276,14 @@ icu_diagnose %>%
   print() -> icu_diagnose
 ```
 
+Finally, we convert the length of patient's stay in ICU into whether the patient stay more than 5 days in ICU, and get the final version of `icu_diagnose` table.
+
+```{r}
+icu_diagnose %>%
+  mutate(los = (los >= 5)) %>% 
+  print() -> icu_diagnose
+```
+
 ## Close the connection to a database
 
 Close the connection:
@@ -296,7 +312,7 @@ openplotmat()
 # 1st column indicates x axis position between 0 and 1
 # 2nd column indicates y axis position between 0 and 1
 # automatically assigns vertical position
-num_of_boxes <- 6
+num_of_boxes <- 5
 auto_coords = coordinates(num_of_boxes)
 vert_pos = rev(auto_coords[,1])
 box_pos <- matrix(nrow = num_of_boxes, ncol = 2, data = 0)
@@ -304,28 +320,25 @@ box_pos[1,] = c(0.20, vert_pos[1]) # 1st box
 box_pos[2,] = c(0.70, vert_pos[2]) # 2nd box
 box_pos[3,] = c(0.70, vert_pos[3]) # 3rd box
 box_pos[4,] = c(0.70, vert_pos[4]) # etc...
-box_pos[5,] = c(0.70, vert_pos[5])
-box_pos[6,] = c(0.20, vert_pos[6])
+box_pos[5,] = c(0.20, vert_pos[5])
 
 # content of boxes
 box_content <- matrix(nrow = num_of_boxes, ncol = 1, data = 0)
-box_content[1] = "All patients in MIMIC-III \n n = 58,976" # 1st box
-box_content[2] = "Exclude patients of age < 18 \n n = 8,180" # 2nd box
-box_content[3] = "Exclude patients with no ICU admissions \n n = 1,071" # 3rd box
-box_content[4] = "Exclude patients with diabetes \n n = 1,324" # etc...
-box_content[5] = "Exclude patients with sepsis \n n = 4,804"
-box_content[6] = "Study cohort \n n = 43,597"
+box_content[1] = "All admissions in MIMIC-III \n n = 58,976" # 1st box
+box_content[2] = "Exclude patients with no ICU admissions \n n = 1,071" # 2nd box
+box_content[3] = "Exclude patients with no pregancy \n n = 57260" # 3rd box
+box_content[4] = "Exclude patients with uncentral diagnose \n n = 492" # etc...
+box_content[5] = "Study cohort \n n = 153"
 
 # adjust the size of boxes to fit content
-box_x <- c(0.20, 0.25, 0.25, 0.25, 0.25, 0.20)
-box_y <- c(0.07, 0.07, 0.07, 0.07, 0.07, 0.07)
+box_x <- c(0.20, 0.25, 0.25, 0.25, 0.20)
+box_y <- c(0.07, 0.07, 0.07, 0.07, 0.07)
 
 # Draw the arrows
 straightarrow(from = c(box_pos[1,1],box_pos[2,2]), to = box_pos[2,], lwd = 1)  
 straightarrow(from = c(box_pos[1,1],box_pos[3,2]), to = box_pos[3,], lwd = 1)  
 straightarrow(from = c(box_pos[1,1],box_pos[4,2]), to = box_pos[4,], lwd = 1)  
-straightarrow(from = c(box_pos[1,1],box_pos[5,2]), to = box_pos[5,], lwd = 1)  
-straightarrow(from = box_pos[1,], to = box_pos[6,], lwd = 1)
+straightarrow(from = box_pos[1,], to = box_pos[5,], lwd = 1)
 
 # Draw the boxes
 for (i in 1:num_of_boxes) {
@@ -347,6 +360,9 @@ sudo R -e 'Sys.setenv(PG_INCDIR="/usr/pgsql-11/include/"); Sys.setenv(PG_LIBDIR=
 ```
 
 # Data visualization
+
+Now we have a study cohort consisting of pregant patient information. Some patients stay in ICU for more than 5 days and the others do not. Plot each column of the patient information with respect to whether the patient stay in ICU for more than 5 days to get the sense of inherent relationships between them.
+
 
 
 # Analytics
