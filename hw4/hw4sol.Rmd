@@ -323,8 +323,8 @@ box_content <- matrix(nrow = num_of_boxes, ncol = 1, data = 0)
 box_content[1] = "All admissions in MIMIC-III \n n = 58,976" # 1st box
 box_content[2] = "Exclude patients with no ICU admissions \n n = 1,071" # etc...
 box_content[3] = "Exclude patients with no pregancy \n n = 57260"
-box_content[4] = "Exclude patients with uncentral diagnose \n n = 492"
-box_content[5] = "Study cohort \n n = 153"
+box_content[4] = "Exclude patients with uncentral diagnose \n n = 491"
+box_content[5] = "Study cohort \n n = 154"
 
 # adjust the size of boxes to fit content
 box_x <- c(0.20, 0.25, 0.25, 0.25, 0.20)
@@ -411,20 +411,20 @@ icu_diagnose %>%
   mutate(drg_severity = drg_severity / 4) %>%
   mutate(icd9_code = as.numeric(icd9_code) / 68000) %>%
   mutate(ethnic_group = ethnic_group / 5) %>%
-  print() -> raw_data
+  print() -> raw_data0
 
-raw_data <- as.data.frame(raw_data) %>% 
+raw_data <- as.data.frame(raw_data0) %>% 
   unname() %>% 
   # as.matrix() %>% 
   print()
 
-x_train <- raw_data[1:130, 1:5] %>% as.matrix() %>% print()
-y_train <- raw_data[1:130, 6] %>% as.matrix() %>% print()
+x_train <- raw_data[1:130, 1:5] %>% print()
+y_train <- raw_data[1:130, 6] %>% print()
 dim(x_train)
 dim(y_train)
 
-x_test <- raw_data[131:154, 1:5] %>% as.matrix() %>% print()
-y_test <- raw_data[131:154, 6] %>% as.matrix() %>% print()
+x_test <- raw_data[131:154, 1:5] %>% print()
+y_test <- raw_data[131:154, 6] %>% print()
 dim(x_test)
 dim(y_test)
 # raw_data <- as.vector(raw_data) %>% print()
@@ -438,6 +438,14 @@ Define a sequential model (a linear stack of layers) with 2 fully-connected hidd
 library(keras)
 # library(tensorflow)
 ```
+```{r}
+x_train1 <- x_train %>% as.matrix()
+y_train1 <- y_train %>% as.matrix()
+
+x_test1 <- x_test %>% as.matrix()
+y_test1 <- y_test %>% as.matrix()
+```
+
 ```{r}
 model1 <- keras_model_sequential()
 model1 %>%
@@ -464,7 +472,7 @@ Trainning and validation.
 ```{r}
 system.time({
   history <- model1 %>% fit(
-    x_train, y_train,
+    x_train1, y_train1,
     epochs = 30, batch_size = 20,
     validation_split = 0.2
   )
@@ -477,16 +485,98 @@ plot(history)
 Evaluate model performance on the test data.
 
 ```{r}
-model1 %>% evaluate(x_test, y_test)
+model1 %>% evaluate(x_test1, y_test1)
 ```
+
+After changing the parameter of the model for several times, loss of around 0.54 and accuracy of around 0.79 are achieved with relatively low calculation cost.
 
 ## Logistic Regression
 
+Data preparation for logistic regression.
+
 ```{r}
-# model2 <- glm(y_train ~., family = binomial(link = 'logit'),
-#               data = x_train)
-# summary(model2)
+library(aod)
+library(ggplot2)
 ```
+```{r}
+raw_data <- as.data.frame(raw_data0) %>% 
+  select(los, age, drg_severity, icd9_code, principal_dx, ethnic_group) %>% 
+  print()
+train <- raw_data[1:130, ] %>% as.tibble()%>% print()
+test <- raw_data[131:154, ] %>% as.tibble() %>% print()
+#   merge(y_train, x_train)
+# names(train)[1] <- "los"
+# train %>% print()
+#   merge(y_test, x_test) 
+# names(test)[1] <- "los"
+# test %>% print()
+```
+```{r}
+summary(train)
+sapply(train, sd)
+```
+
+Define a model with logistic regression.
+
+```{r}
+# train$pricipal_dx <- factor(train$pricipal_dx)
+model2 <- glm(los ~ age + drg_severity + icd9_code + principal_dx 
+              + ethnic_group, data = train, family = "binomial")
+summary(model2)
+```
+
+Predict the probability that the patient stays in ICU for more than 5 days with test data.
+
+```{r}
+x_test2 <- test %>% 
+  select(age, drg_severity, icd9_code, principal_dx, ethnic_group)
+x_test2$P <- predict(model2, newdata = x_test2, type = "response")
+x_test2
+```
+
+Calculate the loss of prediction and plot.
+
+```{r}
+y_test2 <- test %>% 
+  select(los)
+names(y_test2)[1] <- "y"
+y_predict2 <- x_test2 %>% 
+  select(P)
+names(y_predict2)[1] <- "y"
+y <- bind_rows(y_test2, y_predict2)
+type1 <- rep(c("test"), 24) %>% as.tibble()
+names(type1)[1] <- "type" 
+type2 <- rep(c("predict"), 24) %>% as.tibble()
+names(type2)[1] <- "type" 
+type <- bind_rows(type1, type2)
+eva <- data.frame(rep(seq(from = 1, to = 24), 2), y, type)
+names(eva)[1] <- "ind"
+# names(eva)[2] <- "y"
+# names(eva)[3] <- "type"
+eva %>% print()
+eva %>% 
+  group_by(type) %>% 
+  ggplot() +
+  geom_line(mapping = aes(x = ind, y = y, color = type), size = 0.5) +
+  scale_color_manual(values = c("blue", "black"))
+
+# loss <- sqrt(sum((y_test2 - y_predict2)^2) / 24)
+loss <- (-1) * sum(y_test2 * log(y_predict2)) / 24
+loss
+```
+
+Measure how well the model fits by comparing the model with a null model.
+
+```{r}
+with(model2, null.deviance - deviance)
+with(model2, df.null - df.residual)
+with(model2, pchisq(null.deviance - deviance, df.null - df.residual, 
+                    lower.tail = FALSE))
+```
+
+The chi-square of 7.96 with 5 degrees of freedom and an associated p-value of 0.16 tells us that the model as a whole fits better than an empty model, but it is still not accurate enough.
+
+The loss of the logistic regression model seems to have lower loss, but since the number of samples is not abundant, and according to the plot shown above, logistic regression gives moderate predict, which actually may give subtle difference among different patients, then this low loss may not be typical.
 
 ## Close the connection to a database
 
