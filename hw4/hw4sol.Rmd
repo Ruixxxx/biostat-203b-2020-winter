@@ -261,7 +261,8 @@ study_subjects %>%
   group_by(subject_id) %>%
   summarize(ethnic_group = most(ethnic_group)) %>%
   ungroup() %>%
-  mutate(ethnic_group = ifelse(is.na(ethnic_group), "UNKNOWN", ethnic_group)) %>%
+  mutate(ethnic_group = ifelse(is.na(ethnic_group), 
+                               "UNKNOWN", ethnic_group)) %>%
   print() -> subject_ethnic_groups
 ```
 ```{r}
@@ -320,9 +321,9 @@ box_pos[5,] = c(0.20, vert_pos[5])
 # content of boxes
 box_content <- matrix(nrow = num_of_boxes, ncol = 1, data = 0)
 box_content[1] = "All admissions in MIMIC-III \n n = 58,976" # 1st box
-box_content[2] = "Exclude patients with no ICU admissions \n n = 1,071" # 2nd box
-box_content[3] = "Exclude patients with no pregancy \n n = 57260" # 3rd box
-box_content[4] = "Exclude patients with uncentral diagnose \n n = 492" # etc...
+box_content[2] = "Exclude patients with no ICU admissions \n n = 1,071" # etc...
+box_content[3] = "Exclude patients with no pregancy \n n = 57260"
+box_content[4] = "Exclude patients with uncentral diagnose \n n = 492"
 box_content[5] = "Study cohort \n n = 153"
 
 # adjust the size of boxes to fit content
@@ -417,13 +418,13 @@ raw_data <- as.data.frame(raw_data) %>%
   # as.matrix() %>% 
   print()
 
-x_train <- raw_data[1:130, 1:5] %>% print()
-y_train <- raw_data[1:130, 6] %>% print()
+x_train <- raw_data[1:130, 1:5] %>% as.matrix() %>% print()
+y_train <- raw_data[1:130, 6] %>% as.matrix() %>% print()
 dim(x_train)
 dim(y_train)
 
-x_test <- raw_data[131:154, 1:5] %>% print()
-y_test <- raw_data[131:154, 6] %>% print()
+x_test <- raw_data[131:154, 1:5] %>% as.matrix() %>% print()
+y_test <- raw_data[131:154, 6] %>% as.matrix() %>% print()
 dim(x_test)
 dim(y_test)
 # raw_data <- as.vector(raw_data) %>% print()
@@ -435,15 +436,15 @@ Define a sequential model (a linear stack of layers) with 2 fully-connected hidd
 
 ```{r}
 library(keras)
-library(tensorflow)
+# library(tensorflow)
 ```
 ```{r}
 model1 <- keras_model_sequential()
-model1 %>% 
-  layer_dense(units = 10, activation = 'relu', input_shape = c(5)) %>% 
-  layer_dropout(rate= 0.4) %>% 
-  # layer_dense(units = 5, activation = 'relu') %>% 
-  # layer_dropout(rate = 0.3) %>% 
+model1 %>%
+  layer_dense(units = 50, activation = 'relu', input_shape = c(5)) %>%
+  layer_dropout(rate= 0.4) %>%
+  layer_dense(units = 25, activation = 'relu') %>%
+  layer_dropout(rate = 0.3) %>%
   layer_dense(units = 5, activation = 'softmax')
 summary(model1)
 ```
@@ -452,10 +453,39 @@ Compile the model with appropriate loss function, optimizer, and metrics.
 
 ```{r}
 model1 %>% compile(
-  loss = 'categorical_crossentropy', 
-  optimizer = optimizer_rmsprop(), 
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
   metrics = c('accuracy')
 )
+```
+
+Trainning and validation.
+
+```{r}
+system.time({
+  history <- model1 %>% fit(
+    x_train, y_train,
+    epochs = 30, batch_size = 20,
+    validation_split = 0.2
+  )
+})
+```
+```{r}
+plot(history)
+```
+
+Evaluate model performance on the test data.
+
+```{r}
+model1 %>% evaluate(x_test, y_test)
+```
+
+## Logistic Regression
+
+```{r}
+# model2 <- glm(y_train ~., family = binomial(link = 'logit'),
+#               data = x_train)
+# summary(model2)
 ```
 
 ## Close the connection to a database
