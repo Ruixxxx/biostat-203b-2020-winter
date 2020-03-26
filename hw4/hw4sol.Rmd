@@ -1,0 +1,599 @@
+---
+title: "Biostat 203B Homework 4"
+subtitle: Due Mar 22 @ 11:59PM
+author: Rui Xu
+output:
+  # ioslides_presentation: default
+  html_document:
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Task
+
+In this assignment, you are to write a report analyzing the electronic health record (EHR) data MIMIC-III. You report will demostrate your knowledge of working with PostgreSQL database, data visualization, and commonly used analytical methods such as logistic regression and neural network. Your report should include at least following parts:  
+
+1. An informative title. For example, _30-Day Mortality Rate of Myocardia Infarction Patients Admitted to CCU_.  
+
+2. Introduction. Describe the MIMIC-III data set and what research hypothesis/goal you are to address using this data.
+
+3. Data preparation. Create a study cohort from MIMIC-III corresponding to your research hypothesis/goal. See the examplary code below. Use a CONSORT flow diagram to summarize your steps to create the cohort.
+
+4. Data visualization. Use visualization to summarize the cohort you created. 
+
+5. Analytics. Use at least two analytical approaches to address your research hypothesis/goal. For example, we can use (1) logistic regression and (2) neural network to build a predictive model for the 30-day mortality rate of patients admitted into CCU and compare their predictive performance. Summarize your results in graphs.
+
+6. Conclusions. 
+
+# Learning resources about analyzing EHR data
+
+- _Secondary Analysis of Electronic Health Records_: <https://link.springer.com/book/10.1007/978-3-319-43742-2> 
+
+- _The Book of OHDSI_: <https://ohdsi.github.io/TheBookOfOhdsi/>. 
+
+- The GitHub repository <https://github.com/MIT-LCP/mimic-code> contains some code examples for working with the MIMIC-III data. Following sample code derives from <https://github.com/MIT-LCP/mimic-code/blob/master/tutorials/dplyr-frontend/intro.md>. 
+
+# Title: _More-than-5-Day ICU Stay Rate of Pregnant Woman_
+
+# Introduction
+
+The MIMIC-III (**M**edical **I**nformation **M**art for **I**ntensive **C**are III) is a database comprising deidentified health-related data associated with over forty thousand patients who stayed in critical care units of the Beth Israel Deaconess Medical Center between 2001 and 2012. The database includes information such as admission information, patients' demographics, diagnose information, and ICU stay information.
+I plan to use the information to construct a study cohort, where patients are dignosed complications of pregancy, childbirth, and the puerperium, and admitted into ICU. The study cohort covers the age, ethnicity of patients, the severity of ailments, ICD-9 code, principal or not diagnose information, and the length of stay in ICU. Two models are built so that whether a pregant patient stay in ICU for more than 5 days can be predicted with the first 5 variable information.
+
+# Data preparation
+
+## Connect to PostgresSQL database
+
+Load database libraries and the tidyverse frontend:
+```{r}
+library(DBI)
+library(RPostgreSQL)
+library(tidyverse)
+library(lubridate)
+```
+
+Credentials for using PostgreSQL database. We are going to use username `postgres` with password `postgres` to access the `mimic` database in the schemee `mimiciii`. 
+```{r}
+# Load configuration settings
+dbdriver <- 'PostgreSQL'
+#host  <- '127.0.0.1'
+#port  <- '5432'
+user  <- 'postgres'
+password <- 'postgres'
+dbname <- 'mimic'
+schema <- 'mimiciii'
+# Connect to the database using the configuration settings
+con <- dbConnect(RPostgreSQL::PostgreSQL(), 
+                 dbname = dbname, 
+                 #host = host, 
+                 #port = port, 
+                 user = user, 
+                 password = password)
+# Set the default schema
+dbExecute(con, paste("SET search_path TO ", schema, sep=" "))
+con
+```
+List tables in the `mimic` database:
+```{r}
+dbListTables(con)
+```
+
+## Query and subsetting
+
+In this section, we demo how to create a cohort of patients who were admitted into ICU and were diagnosed with pregnancy.
+
+First we create a (query) table of patients who were admitted into ICU.
+```{r}
+tbl(con, "icustays") %>%
+  select(subject_id, hadm_id, los) %>%
+  filter(!is.na(los)) %>% 
+  # group_by(subject_id) %>% 
+  # mutate(los = sum(los)) %>% 
+  # filter(los >= 5) %>% 
+  print() -> icustays
+```
+
+Now we want to restrict to complications of pregancy, childbirth, and the puerperium. To find all possible ICD-9 codes related to this, we search for the list of ICD-9 codes 63000-67999 in the `icd9_code` of table `d_icd_diagnoses`:
+```{r}
+code <- seq(from = 630, to = 679) %>%
+  append(seq(from = 63000, to = 67999))
+# code <- paste(c("^"), 630:679, sep = "")
+code <- as.character(code) #%>%
+#   str_c(collapse = "|")
+# code <- paste("(", code, ")", sep = "")
+tmp <- tbl(con, "d_icd_diagnoses")
+icd <- tribble(~icd9_code, ~long_title)
+for (c in code){
+  icd9 <- tmp %>%
+    filter(icd9_code == c) %>% 
+    select(icd9_code, long_title) %>% as.tibble
+  icd <- bind_rows(icd, icd9)
+  # mutate(icd9_code = as.integer(icd9_code)) %>% 
+  # filter(icd9_code >= 63000, icd9_code < 68000) %>%
+}
+  icd %>% print()
+  dbWriteTable(con, "icd", icd, overwrite = TRUE)
+```
+
+`diagnoses_icd` table stores the diagnosis of each admission. We use `semi_join()` to keep the rows in `diagnoses_icd` that match the ICD-9 codes related to complications of pregancy, childbirth, and the puerperium:
+```{r}
+tbl(con, "diagnoses_icd") %>%
+  semi_join(icd, by = "icd9_code", copy = TRUE) %>%
+  print() -> diagnose
+```
+
+MI may not be listed as the principal diagnosis; as explained in [the documentation for the `patients` table](https://mimic.physionet.org/mimictables/diagnoses_icd/), the `seq_num` field is a priority ranking for the diagnoses generated at the end of stay. In order to focus on patients for whom MI was central to their hospitalization, we will include records with MI in any of the first five diagnosis positions, according to the `seq_num` field. To avoid duplicate admissions, we use `group_by()` and `top_n()` to limit the query to the first MI diagnosis for each admission.
+```{r}
+diagnose %>%
+  filter(seq_num <= 5) %>%
+  group_by(subject_id, hadm_id) %>%
+  # top_n(1, wt = seq_num) %>% #  not working. bug? use following as workaround
+  filter(min_rank(seq_num) <= 1) %>%
+  ungroup() %>%
+  select(subject_id, hadm_id, icd9_code, seq_num) %>%
+  print() -> diagnose
+```
+Now we `inner_join` the table of admissions to ICU and the table of admissions that include MI diagnosis.
+```{r}
+icustays %>%
+  inner_join(diagnose, by = c("subject_id", "hadm_id")) %>% 
+  group_by(subject_id, hadm_id) %>%
+  mutate(los = sum(los)) %>% 
+  summarize_all(min, na.rm = TRUE) %>% 
+  # distinct(subject_id, hadm_id, .keep_all = TRUE) %>%
+  # ungroup() %>%
+  print() -> icu_diagnose
+```
+
+## Transform and augment query tables
+
+Now we create a logical variable indicating the MI is the principal diagonosis or not (according to `seq_num`).
+```{r}
+icu_diagnose %>%
+  mutate(principal_dx = seq_num == 1) %>%
+  select(-seq_num) %>%
+  print() -> icu_diagnose
+```
+
+We want to add information about the severity of patients’ ailments. The `drgcodes` table contains, for `DRG` codes from the All Payers Registry (APR), severity and mortality indicators. We pull the drug severity information and right-join it to our query table.
+```{r}
+tbl(con, "drgcodes") %>%
+  filter(str_detect(drg_type, "APR")) %>%
+  select(subject_id, hadm_id, drg_severity) %>%
+  right_join(icu_diagnose, by = c("subject_id", "hadm_id")) %>%
+  distinct() %>% 
+  mutate(drg_severity = ifelse(is.na(drg_severity), 1, drg_severity)) %>%
+  print() -> icu_diagnose
+```
+
+Pull the admission time `admittime`, discharge time `dischtime`, date of birth `dob`, and date of death `dod`.
+```{r}
+icu_diagnose %>%
+  left_join(
+    select(tbl(con, "admissions"),
+           subject_id, hadm_id, admittime, dischtime
+    ), by = c("subject_id", "hadm_id")
+  ) %>%
+  left_join(
+    select(tbl(con, "patients"), subject_id, dob, dod),
+    by = "subject_id"
+  ) %>%
+  print(width = Inf) -> icu_diagnose
+```
+
+To add `age` (at admission) variable into the table. [The documentation for the patients table](https://mimic.physionet.org/mimictables/patients/) explains that patients of 90 years and older had their ages artificially inflated, so we remove these patients from the analysis.
+```{r}
+icu_diagnose %>%
+  mutate(age = date_part("year", admittime) - date_part("year", dob)) %>%
+  filter(age < 90) %>%
+  mutate(age = age - ifelse(
+    date_part("month", admittime) < date_part("month", dob) |
+      (
+        date_part("month", admittime) == date_part("month", dob) &
+          date_part("day", admittime) < date_part("day", dob)
+      ),
+    1,
+    0
+  )) %>%
+  select(-admittime, -dischtime, -dob, -dod) %>%
+  select(subject_id, hadm_id, age, everything()) %>%
+  print() -> icu_diagnose
+```
+
+Finally, let's merge some demographic information (ethnicity) into our study `icu_diagnose`.
+```{r}
+tbl(con, "admissions") %>%
+  select(subject_id, ethnicity) %>%
+  distinct() %>%
+  print() -> study_subjects
+```
+```{r}
+tbl(con, "patients") %>%
+  select(subject_id, gender) %>%
+  distinct() %>%
+  full_join(study_subjects, by = "subject_id") %>%
+  print() -> study_subjects
+```
+```{r}
+study_subjects %>%
+  semi_join(icu_diagnose, by = "subject_id") %>%
+  print() -> study_subjects
+```
+Let's resolves ome diversity and inconsistency in the `ethnicity` field:
+```{r}
+unknown_ethnicity <- c(
+  "OTHER",
+  "UNABLE TO OBTAIN",
+  "UNKNOWN/NOT SPECIFIED",
+  "MULTI RACE ETHNICITY",
+  "PATIENT DECLINED TO ANSWER",
+  "UNKNOWN"
+)
+
+study_subjects %>%
+  collect() %>%
+  mutate(ethnic_group = case_when(
+    str_detect(ethnicity, "^ASIAN") ~ "ASIAN",
+    str_detect(ethnicity, "^BLACK") ~ "BLACK",
+    str_detect(ethnicity, "^HISPANIC") ~ "HISPANIC",
+    str_detect(ethnicity, "^WHITE") ~ "WHITE",
+    ethnicity %in% unknown_ethnicity ~ NA_character_,
+    TRUE ~ NA_character_
+  )) %>%
+  select(subject_id, gender, ethnic_group) %>%
+  print() -> study_subjects
+```
+
+Some patients are coded as belonging to more than one ethnic group. To resolve these inconsistencies, we define a helper function to pick the modal value from a vector of values in R, which can be used by the `summarize()` function to choose one ethnic group for each patient.
+```{r}
+most <- function(x) {
+  if (all(is.na(x))) return(NA_character_)
+  y <- table(x, useNA = "no")
+  if (length(which(y == max(y))) > 1) return(NA_character_)
+  return(names(y)[which.max(y)])
+}
+
+study_subjects %>%
+  group_by(subject_id) %>%
+  summarize(ethnic_group = most(ethnic_group)) %>%
+  ungroup() %>%
+  mutate(ethnic_group = ifelse(is.na(ethnic_group), 
+                               "UNKNOWN", ethnic_group)) %>%
+  print() -> subject_ethnic_groups
+```
+```{r}
+study_subjects %>%
+  select(subject_id, gender) %>%
+  left_join(subject_ethnic_groups, by = "subject_id") %>%
+  print() -> study_subjects
+```
+Now we add the demographic information `gender` and `ethnicity` into our `icu_diagnose` table:
+```{r}
+icu_diagnose %>%
+  left_join(study_subjects, by = "subject_id", copy = TRUE) %>%
+  print() -> icu_diagnose
+```
+
+Finally, we convert the length of patient's stay in ICU into whether the patient stay more than 5 days in ICU, and get the final version of `icu_diagnose` table.
+
+```{r}
+icu_diagnose %>%
+  mutate(los = (los >= 5)) %>% 
+  print(width = Inf) -> icu_diagnose
+icu_diagnose %>% as.tibble()
+```
+
+## CONSORT Flow Diagrams
+
+CONSORT Flow Diagrams can be used to plot the flow of data selection of a patient cohort.   
+For more details, see:
+[The CONSORT Flow Diagram](http://www.consort-statement.org/consort-statement/flow-diagram). Following code shows an example. 
+
+```{r plot}
+library(shape)
+library(diagram)
+
+# set margins and multiplot
+par(mfrow = c(1, 1))
+par(mar = c(0, 0, 0, 0))
+
+# initialise a plot device
+openplotmat()
+
+# position of boxes
+# 1st column indicates x axis position between 0 and 1
+# 2nd column indicates y axis position between 0 and 1
+# automatically assigns vertical position
+num_of_boxes <- 5
+auto_coords = coordinates(num_of_boxes)
+vert_pos = rev(auto_coords[,1])
+box_pos <- matrix(nrow = num_of_boxes, ncol = 2, data = 0)
+box_pos[1,] = c(0.20, vert_pos[1]) # 1st box
+box_pos[2,] = c(0.70, vert_pos[2]) # 2nd box
+box_pos[3,] = c(0.70, vert_pos[3]) # 3rd box
+box_pos[4,] = c(0.70, vert_pos[4]) # etc...
+box_pos[5,] = c(0.20, vert_pos[5])
+
+# content of boxes
+box_content <- matrix(nrow = num_of_boxes, ncol = 1, data = 0)
+box_content[1] = "All admissions in MIMIC-III \n n = 58,976" # 1st box
+box_content[2] = "Exclude patients with no ICU admissions \n n = 1,071" # etc...
+box_content[3] = "Exclude patients with no pregancy \n n = 57260"
+box_content[4] = "Exclude patients with uncentral diagnose \n n = 491"
+box_content[5] = "Study cohort \n n = 154"
+
+# adjust the size of boxes to fit content
+box_x <- c(0.20, 0.25, 0.25, 0.25, 0.20)
+box_y <- c(0.07, 0.07, 0.07, 0.07, 0.07)
+
+# Draw the arrows
+straightarrow(from = c(box_pos[1,1],box_pos[2,2]), to = box_pos[2,], lwd = 1)  
+straightarrow(from = c(box_pos[1,1],box_pos[3,2]), to = box_pos[3,], lwd = 1)  
+straightarrow(from = c(box_pos[1,1],box_pos[4,2]), to = box_pos[4,], lwd = 1)  
+straightarrow(from = box_pos[1,], to = box_pos[5,], lwd = 1)
+
+# Draw the boxes
+for (i in 1:num_of_boxes) {
+  textrect(mid = box_pos[i,], radx = box_x[i], rady = box_y[i], 
+           lab = box_content[i], 
+           shadow.col = "grey")
+  }
+```
+
+
+# Data visualization
+
+Now we have a study cohort consisting of pregant patient information. Some patients stay in ICU for more than 5 days and the others do not. Plot each column of the patient information with respect to whether the patient stay in ICU for more than 5 days to get the sense of inherent relationships between them.
+
+Based on each cohort record, the age at admission is treated as a discrete variable. There are similar amounts of patients at full age that stay in ICU for more than 5 days.
+
+```{r}
+icu_diagnose %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = age, fill = los))
+```
+
+Based on each cohort record, the severity of patients' ailments is treated as a discrete variable. Patients with severer ailments tend to stay more than 5 days in ICU.
+
+```{r}
+icu_diagnose %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = drg_severity, fill = los))
+```
+
+Based on each cohort record, the ICD-9 code related to complications of pregancy, childbirth, and the puerperium is treated as a discrete variable. Patients with different ICD-9 code have significant difference in whether the length of stay in ICU is more than 5 days or not.
+
+```{r}
+icu_diagnose %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = icd9_code, fill = los)) + 
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+Based on each cohort record, whether principal diagonosis or not is treated as a discrete variable. Patients diagonosed pregancy principally tend to stay more than 5 days in ICU.
+
+```{r}
+icu_diagnose %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = principal_dx, fill = los))
+```
+
+Based on each cohort record, the ethnicity of patients is treated as a discrete variable. Patients with hispanic ethnicity tend to stay less than 5 days in ICU.
+
+```{r}
+icu_diagnose %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = ethnic_group, fill = los)) + 
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+# Analytics
+
+Let's further manipulate the study cohort such that all the variables are type of numerial values between 0 and 1.
+
+```{r}
+icu_diagnose %>% 
+  mutate(los = ifelse(los, 1, 0)) %>% 
+  mutate(principal_dx = ifelse(principal_dx, 1, 0)) %>% 
+  mutate(ethnic_group = case_when(
+    str_detect(ethnic_group, "ASIAN") ~ 1, 
+    str_detect(ethnic_group, "BLACK") ~ 2, 
+    str_detect(ethnic_group, "HISPANIC") ~ 3, 
+    str_detect(ethnic_group, "WHITE") ~ 4, 
+    str_detect(ethnic_group, "UNKNOWN") ~ 5
+  )) %>% 
+  select(age, drg_severity, icd9_code, principal_dx, ethnic_group, los) %>% 
+  mutate(age = age / 45.0) %>%
+  mutate(drg_severity = drg_severity / 4) %>%
+  mutate(icd9_code = as.numeric(icd9_code) / 68000) %>%
+  mutate(ethnic_group = ethnic_group / 5) %>%
+  print() -> raw_data0
+
+raw_data <- as.data.frame(raw_data0) %>% 
+  unname() %>% 
+  # as.matrix() %>% 
+  print()
+
+x_train <- raw_data[1:130, 1:5] %>% print()
+y_train <- raw_data[1:130, 6] %>% print()
+dim(x_train)
+dim(y_train)
+
+x_test <- raw_data[131:154, 1:5] %>% print()
+y_test <- raw_data[131:154, 6] %>% print()
+dim(x_test)
+dim(y_test)
+# raw_data <- as.vector(raw_data) %>% print()
+```
+
+## MNIST-MLP model
+
+Define a sequential model (a linear stack of layers) with 2 fully-connected hidden layers (50 and 25 neurons).
+
+```{r}
+library(keras)
+# library(tensorflow)
+```
+```{r}
+x_train1 <- x_train %>% as.matrix()
+y_train1 <- y_train %>% as.matrix()
+
+x_test1 <- x_test %>% as.matrix()
+y_test1 <- y_test %>% as.matrix()
+```
+
+```{r}
+model1 <- keras_model_sequential()
+model1 %>%
+  layer_dense(units = 50, activation = 'relu', input_shape = c(5)) %>%
+  layer_dropout(rate= 0.4) %>%
+  layer_dense(units = 25, activation = 'relu') %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = 5, activation = 'softmax')
+summary(model1)
+```
+
+Compile the model with appropriate loss function, optimizer, and metrics.
+
+```{r}
+model1 %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+```
+
+Trainning and validation.
+
+```{r}
+system.time({
+  history <- model1 %>% fit(
+    x_train1, y_train1,
+    epochs = 30, batch_size = 20,
+    validation_split = 0.2
+  )
+})
+```
+```{r}
+plot(history)
+```
+
+Evaluate model performance on the test data.
+
+```{r}
+model1 %>% evaluate(x_test1, y_test1)
+```
+
+After changing the parameters of the model for several times, loss of around 0.54 and accuracy of around 0.79 are achieved with relatively low calculation cost.
+
+## Logistic Regression
+
+Data preparation for logistic regression.
+
+```{r}
+library(aod)
+library(ggplot2)
+```
+```{r}
+raw_data <- as.data.frame(raw_data0) %>% 
+  select(los, age, drg_severity, icd9_code, principal_dx, ethnic_group) %>% 
+  print()
+train <- raw_data[1:130, ] %>% as.tibble()%>% print()
+test <- raw_data[131:154, ] %>% as.tibble() %>% print()
+#   merge(y_train, x_train)
+# names(train)[1] <- "los"
+# train %>% print()
+#   merge(y_test, x_test) 
+# names(test)[1] <- "los"
+# test %>% print()
+```
+```{r}
+summary(train)
+sapply(train, sd)
+```
+
+Define a model with logistic regression.
+
+```{r}
+# train$pricipal_dx <- factor(train$pricipal_dx)
+model2 <- glm(los ~ age + drg_severity + icd9_code + principal_dx 
+              + ethnic_group, data = train, family = "binomial")
+summary(model2)
+```
+
+Predict the probability that the patient stays in ICU for more than 5 days with test data.
+
+```{r}
+x_test2 <- test %>% 
+  select(age, drg_severity, icd9_code, principal_dx, ethnic_group)
+x_test2$P <- predict(model2, newdata = x_test2, type = "response")
+x_test2
+```
+
+Calculate the loss of prediction and plot.
+
+```{r}
+y_test2 <- test %>% 
+  select(los)
+names(y_test2)[1] <- "y"
+y_predict2 <- x_test2 %>% 
+  select(P)
+names(y_predict2)[1] <- "y"
+y <- bind_rows(y_test2, y_predict2)
+type1 <- rep(c("test"), 24) %>% as.tibble()
+names(type1)[1] <- "type" 
+type2 <- rep(c("predict"), 24) %>% as.tibble()
+names(type2)[1] <- "type" 
+type <- bind_rows(type1, type2)
+eva <- data.frame(rep(seq(from = 1, to = 24), 2), y, type)
+names(eva)[1] <- "ind"
+# names(eva)[2] <- "y"
+# names(eva)[3] <- "type"
+eva %>% print()
+eva %>% 
+  group_by(type) %>% 
+  ggplot() +
+  geom_line(mapping = aes(x = ind, y = y, color = type), size = 0.5) +
+  scale_color_manual(values = c("blue", "black"))
+
+# loss <- sqrt(sum((y_test2 - y_predict2)^2) / 24)
+loss <- (-1) * sum(y_test2 * log(y_predict2)) / 24
+loss
+```
+
+Measure how well the model fits by comparing the model with a null model.
+
+```{r}
+with(model2, null.deviance - deviance)
+with(model2, df.null - df.residual)
+with(model2, pchisq(null.deviance - deviance, df.null - df.residual, 
+                    lower.tail = FALSE))
+```
+
+The chi-square of 7.96 with 5 degrees of freedom and an associated p-value of 0.16 tells us that the model as a whole fits better than an empty model, but it is still not accurate enough.
+
+The logistic regression model seems to have lower loss, but since the number of samples is not abundant, and according to the plot shown above, logistic regression gives moderate predict, which actually gives subtle difference among different patients, then this low loss may not be typical.
+
+## Close the connection to a database
+
+Close the connection:
+```{r}
+dbDisconnect(con)
+```
+
+# Conclusions
+
+This report analyzes the MIMIC-III data, specifically, information related to patients dignosed complications of pregancy, childbirth, and the puerperium, and admitted into ICU. The study cohort covers the age, ethnicity of patients, the severity of ailments, ICD-9 code, principal or not diagnose information, and the length of stay in ICU. The first 5 variable information is chosen to predict whether a pregant patient stay in ICU for more than 5 days. MNIST-MLP model and logistic regression model are applied to this study cohort.
+The study cohort is separated into two groups, one as training group and the other as test group. The two models are trained using training group. The predictive performance of the two models is evaluated by the test group. According to the losses of the two models, logistic regression seems to perform better; however, the amount of the samples is very limited, and the logistic regression gives moderate prediction, which may contribute to the low lost, so from this study cohort, we cannot say that logistic regression is better than MNIST-MLP. And since the number of samples is limited, neither of the two models makes accurate enough prediction. Thus, in order to make good prediction, the samples and the model need to be chosen carefully. 
+
+
+
+
+
+
+
+
